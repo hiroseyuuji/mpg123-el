@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2004 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Thu Feb 12 15:40:08 2004 on firestorm
-;;; Update count: 1252
+;;; Last modified Fri Sep 17 11:57:47 2004 on firestorm
+;;; Update count: 1261
 
 ;;[News]
 ;;	mpg123-display-slider (key bound to ".") introduced.
@@ -346,6 +346,7 @@
 ;;		Fixed handling of mpg123*initial-buffer.
 ;;	Len Trigg <lenbok@myrealbox.com>
 ;;		Sent a patch and report on playlist file parsing.
+;;		Remote control stuffs.
 ;;	Rene Kyllingstad <kyllingstad@users.sourceforge.net>
 ;;		Many enhancements; mpg123-set-point-for-next-song-function,
 ;;		mpg123-format-name-function, using SIGTERM, id3v1.1,
@@ -357,6 +358,12 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.43  2004/09/17 03:09:04  yuuji
+;; * Support music longer than 99:59(not tested heavily).
+;; * Add mpg123-active-p for external add-on's.
+;; * Indicator and slider overlay can't be moved by insert-before-markers
+;;   on XEmacs.  Fixed.
+;;
 ;; Revision 1.42  2004/02/12 07:09:31  yuuji
 ;; mpg123-display-slider (key bound to ".") introduced.
 ;; mpg123 now tries to keep slider visible.
@@ -727,6 +734,13 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
     (if playingp
 	(mpg123:get-music-info mpg123*cur-music-number 'name))))
 
+(defun mpg123-active-p ()		;from Len Trigg
+  "Returns the mpg123 buffer if mpg123 is active, otherwise nil.
+Songs need not be actually playing.  This may be used as an indicator as to
+whether mpg123 functions can be called."
+  (and (boundp 'mpg123*buffer) 
+       (get-buffer mpg123*buffer)))
+
 (defun mpg123:file-name-extension (name)
   (let ((md (match-data)))
     (prog1
@@ -900,7 +914,7 @@ If optional argument PATTERN given, search it(tentative)."
   ;;currently being played music is in stac-buffer.
   (goto-char mpg123*cur-play-marker)
   (skip-chars-forward "^:")
-  (forward-char -2))
+  (skip-chars-backward "^ "))
 ; (defmacro mpg123:goto-playtime-position ()
 ;   (list 'progn
 ; 	(list 'goto-char 'mpg123*cur-play-marker)
@@ -916,6 +930,7 @@ If optional argument PATTERN given, search it(tentative)."
     (let (buffer-read-only)
       (or here (mpg123:goto-playtime-position))
       (delete-char 5)
+      (while (/= (char-after (point)) ?/) (delete-char 1))
       (insert timestr))))
 
 ; (defmacro mpg123:update-playtime (timestr)
@@ -936,7 +951,7 @@ If optional argument PATTERN given, search it(tentative)."
     (mpg123:goto-playtime-position)
     (skip-chars-forward "^/")
     (forward-char 1)
-    (delete-char 5)
+    (delete-char 5);this deletion 5 chars may correct. because "--:--"
     (insert timestr)))
 
 (defun mpg123:update-volume (vollist)
@@ -947,7 +962,8 @@ If optional argument PATTERN given, search it(tentative)."
       (goto-char mpg123*volume-marker)
       (delete-region (point) (progn (skip-chars-forward "^\\]") (point)))
       (if (and (listp vollist) (integerp (car vollist)))
-	  (insert (format "%03d:%03d" (car vollist) (cdr vollist)))
+	  (let ((vstr (format "%03d:%03d" (car vollist) (cdr vollist))))
+	    (insert vstr) (message "Volume: %s" vstr))
 	(insert "N/A")))))
 
 (defun mpg123:update-repeat-count ()
@@ -1158,7 +1174,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 (defun mpg123:time2frame (timestr &optional filename)
   "Convert time string (mm:ss) to frame number.(0.026s/f)"
   (setq filename (or filename mpg123*cur-music-file))
-  (string-match "\\(..?\\):\\(..\\)" timestr)
+  (string-match "\\([-0-9]+\\):\\(..\\)" timestr)
   (let*((m (string-to-number
 	    (substring timestr (match-beginning 1) (match-end 1))))
 	(s (string-to-number
@@ -1173,9 +1189,12 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
     (if (and frames length)
 	;;if total frames and length(in time) is available,
 	;;use them to calculate target frame number
-	(setq ratio-f frames
-	      ratio-s (+ (* 60 (string-to-number (substring length 0 2)))
-			 (string-to-number (substring length 3 5)))))
+	(let*((colon (string-match ":" length))
+	      (lmin (substring length 0 colon))
+	      (lsec (substring length (1+ colon))))
+	  (setq ratio-f frames
+		ratio-s (+ (* 60 (string-to-number lmin))
+			   (string-to-number lsec)))))
     (format "%d" (/ (* total ratio-f) ratio-s))))
 
 (defun mpg123:in-music-list-p ()
@@ -1886,7 +1905,7 @@ percentage in the length of the song etc.
   (let*((selw (selected-window))
 	(cb (current-buffer))
 	(mpgw (get-buffer-window mpg123*buffer t))
-	(mpgf (window-frame mpgw))
+	;(mpgf (window-frame mpgw))
 	mpgwinlist nowvisible needed-lines numlines (numwin 1)
 	w redrawp (i 300))
     (unwind-protect
@@ -1939,9 +1958,11 @@ percentage in the length of the song etc.
 	     ((= numwin 1)
 	      (mpg123:display-slider-sub))))))
       ;; for XEmacs, select previous window
-      (focus-frame (window-frame selw))
-      (select-window selw)
-      (sit-for 0))))
+      (if selw
+	  (progn
+	    (focus-frame (window-frame selw))
+	    (select-window selw)
+	    (sit-for 0))))))
 
 (defun mpg123-shuffle (&optional method)
   "Shuffle the music!
@@ -2001,18 +2022,21 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (delete-region (point) mpg123*end-of-list-marker)
     (goto-char p)))
 
-(defun mpg123-delete-file ()
-  "Delete audio file on the point."
+(defun mpg123-delete-file (optional command)
+  "Delete audio file on the point.
+When called from function, optional argument COMMAND directly select the job."
   (interactive)
   (if (not (mpg123:in-music-list-p))
     (error "Not on music list"))
   (let*((n (mpg123:get-music-number)) p c
 	(file (mpg123:get-music-info n 'filename)))
-    (message (mpg123:lang-msg
-	      "Delete file?(%s) [Y]es, [L]from list, [N]o"
-	      "消してええ?(%s) Y=>よか  L=>曲一覧から  N=>だめ")
-	     (file-name-nondirectory file))
-    (setq c (read-char))
+    (if command
+	nil
+      (message (mpg123:lang-msg
+		"Delete file?(%s) [Y]es, [L]from list, [N]o"
+		"消してええ?(%s) Y=>よか  L=>曲一覧から  N=>だめ")
+	       (file-name-nondirectory file))
+      (setq c (read-char)))
     (cond
      ((memq c '(?y ?Y ?L ?l))
       (beginning-of-line)
@@ -2428,6 +2452,11 @@ the music will immediately move to that position."
 	    (mpg123:set-music-info
 	     i 'mark (mpg123:time2frame sf f))))
       (insert-before-markers (mpg123:format-line i))
+      (if (featurep 'xemacs)
+	  (let ((pt (point)))
+	    (move-overlay mpg123*slider-overlay pt (1+ pt))
+	    (move-overlay mpg123*indicator-overlay
+			  pt (+ pt mpg123*window-width))))
       (setq i (1+ i)
 	    files (cdr files)))))
 
