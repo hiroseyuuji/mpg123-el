@@ -2,8 +2,8 @@
 ;;; A front-end program for mpg123
 ;;; (c)1999 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Tue Jun 22 22:04:47 1999 on firestorm
-;;; Update count: 257
+;;; Last modified Thu Jun 24 17:01:49 1999 on vfr
+;;; Update count: 320
 
 ;;[Commentary]
 ;;	
@@ -107,6 +107,11 @@
 ;;	mpg123を走らせながら書いてます。windows.el は
 ;;	http://www.gentei.org/~yuuji/software/ からどうぞ。
 ;;	
+;;[Bugs]
+;;	
+;;	It is impossible to yank music line onto the end of list.
+;;	曲リストの最後尾にスタックからの曲をyankできません。
+;;	
 ;;[No Warranty]
 ;;	
 ;;	This  program is  free  software and  comes  with absolutely  NO
@@ -132,20 +137,32 @@
    ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet
    ((string-match "linux" (emacs-version))	'linux))) ;not yet maybe
 
-(defvar mpg123-command "mpg123")
+(defvar mpg123-command "mpg123"
+  "*Command name of mpg123 player. Need 0.59q or later.
+mpg123のコマンド名。0.59qが必要。")
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
-	     '((freebsd . "mixer") (linux . "aumix")))))
+	     '((freebsd . "mixer") (linux . "aumix"))))
+  "*Command name for mixer setting utility
+mixer調節用コマンド")
 (defvar mpg123-mixer-setvol-target-list
   (cdr (assq mpg123-system-type
-	     '((freebsd . ("vol" "pcm")) (linux . '("-v"))))))
-(defvar mpg123-mode-map nil)
+	     '((freebsd . ("vol" "pcm")) (linux . '("-v")))))
+  "*Option list for volume setting utility.
+mixer調節コマンドの音量調節オプションのリスト")
 (defvar mpg123-preserve-playtime t
   "When shift to other music, leave playing time of current music, or not")
-(defvar mpg123-id3-tag-function 'mpg123:peek-tag)
-(defvar mpg123-startup-volume 30)
-(defvar mpg123-default-repeat 0)
+(defvar mpg123-id3-tag-function 'mpg123:peek-tag
+  "*Emacs-Lisp function for extracting ID3 tag.
+MP3からID3を取得するための関数")
+(defvar mpg123-startup-volume 30
+  "*Default sound volume at startup of this program.
+mpg123.el初回起動時の音量のデフォルト値.")
+(defvar mpg123-default-repeat 0
+  "*Default number of repetition of through playing.
+再生のデフォルトのリピート回数")
 
+(defvar mpg123-mode-map nil)
 (setq mpg123-mode-map (make-keymap))
 (define-key mpg123-mode-map "p" 'mpg123-prev-line)
 (define-key mpg123-mode-map "n" 'mpg123-next-line)
@@ -165,6 +182,9 @@
 (define-key mpg123-mode-map "o" 'mpg123-open-new)
 (define-key mpg123-mode-map "i" 'mpg123-increase-repeat-count)
 (define-key mpg123-mode-map "d" 'mpg123-decrease-repeat-count)
+(define-key mpg123-mode-map "k" 'mpg123-kill-line)
+(define-key mpg123-mode-map "y" 'mpg123-yank-line)
+(define-key mpg123-mode-map "s" 'mpg123-shuffle)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
 
 ;;;
@@ -189,16 +209,18 @@
 (defvar mpg123*repeat-count-marker nil)
 
 (defun mpg123:sound-p (f)
-  (and (> (nth 7 (file-attributes f)) 128)
+  "Check the file F is MPEG 1 Audio file or not."
+  (and (> (nth 7 (file-attributes f)) 128) ;check file size > 128
        (let ((b (get-buffer-create " *mpg123tmp*"))
 	     (file-coding-system-alist (list (cons "." 'no-conversion))) ;20
 	     (file-coding-system-for-read)) ;19
 	 (set-buffer b)
 	 (erase-buffer)
-	 (insert-file-contents f nil 0 2)
+	 (insert-file-contents f nil 0 2) ;insert 2bytes of the beginning
 	 (goto-char (point-min))
-	 (prog1
-	     (and (= (char-after 1) ?\377) (= (char-after 2) ?\373))
+	 (prog1 ; if short & 0xfff0 = 0xfff0, it is MPEG audio
+	     (and (= (char-after 1) ?\xFF)
+		  (= (logand (char-after 2) ?\xF0) ?\xF0))
 	   (kill-buffer b)))))
 
 (defun mpg123-next-line (arg)
@@ -229,8 +251,9 @@
 ;     (delete-char 5)
 ;     (insert timestr)))
 (defmacro mpg123:update-playtime (timestr)
-  (list 'progn
-	(list 'set-buffer 'mpg123*buffer)
+  (list 'progn  ;; 'save-excursion  ??
+	(list 'set-buffer (list 'marker-buffer 'mpg123*cur-play-marker))
+	;(list 'set-buffer 'mpg123*buffer)
 	(list 'let (list 'buffer-read-only)
 	      (list 'mpg123:goto-playtime-position)
 	      (list 'delete-char 5)
@@ -295,8 +318,8 @@
 (defun mpg123:filter (proc mess)
   (if (stringp mess)
       (save-excursion
-	(set-buffer (get-buffer-create mpg123*info-buffer))
-	(insert mess)
+	;;(set-buffer mpg123*info-buffer)  ;heavy
+	;;(insert mess)                    ;jobs
 	(if (string-match "Time: \\(..:..\\)... +\\[\\(..:..\\)" mess)
 	    (let ((s (substring mess (match-beginning 1) (match-end 1)))
 		  l)
@@ -315,7 +338,6 @@
 	(if (string-match "Frame# +\\([0-9]+\\)" mess)
 	    (setq mpg123*cur-playframe
 		  (substring mess  (match-beginning 1) (match-end 1))))
-	
 	)))
 
 (defun mpg123:sentinel (proc state)
@@ -327,12 +349,16 @@
 	  )
       (setq mpg123*time-setting-mode nil)
       (mpg123:update-playtime "--:--")
-      (goto-char mpg123*cur-play-marker)
-      (mpg123-next-line 1)
-      (if (and (not (mpg123:in-music-list-p))
-	       (mpg123:repeat-check))
-	  (goto-char (point-min)))
-      (mpg123:play)))))
+      (if (eq (get-buffer mpg123*buffer)
+	      (marker-buffer mpg123*cur-play-marker))
+	  (progn
+	    (set-buffer mpg123*buffer)
+	    (goto-char mpg123*cur-play-marker)
+	    (mpg123-next-line 1)
+	    (if (and (not (mpg123:in-music-list-p))
+		     (mpg123:repeat-check))
+		(goto-char (point-min)))
+	    (mpg123:play)))))))
 
 (defun mpg123:time2frame (timestr)
   "Convert time string (mm:ss) to frame number.(0.026s/f)"
@@ -345,12 +371,14 @@
     (format "%d" (/ (* total 1000) 26))))
 
 (defun mpg123:in-music-list-p ()
-  (< (point) mpg123*end-of-list-marker))
+  (and (equal mpg123*buffer (buffer-name))
+       (< (point) mpg123*end-of-list-marker)))
 
 (defun mpg123:play (&optional startframe)
   "Play mp3 on current line."
   (save-excursion
     (set-buffer (get-buffer-create mpg123*info-buffer))
+    (buffer-disable-undo)
     (erase-buffer))
   (beginning-of-line)
   (if (and mpg123*cur-play-marker
@@ -574,6 +602,140 @@
   (interactive "p")
   (mpg123-increase-repeat-count (- arg)))
 
+(defun mpg123:get-music-number ()
+  "Get current line's music number."
+  (save-excursion
+    (beginning-of-line)
+    (skip-chars-forward " \t" nil)
+    (and
+     (looking-at "[0-9]+")
+     (string-to-int (buffer-substring (match-beginning 0) (match-end 0))))))
+
+(defvar mpg123-popup-window-height 8)
+(defun mpg123:popup-buffer (buffer)
+  "Popup specified BUFFER."
+  (cond
+   ((get-buffer-window buffer)
+    (select-window (get-buffer-window buffer)))
+   ((one-window-p)
+      (let ((h (max window-min-height
+		    (- (window-height) mpg123-popup-window-height))))
+	(split-window nil h)
+	(other-window 1)
+	(switch-to-buffer buffer)))
+   (t
+    (other-window 1)
+    (switch-to-buffer buffer))))
+
+(defvar mpg123*stack-buffer " *mpg123 stack*")
+(defun mpg123-kill-line (arg)
+  "Kill current music line and move it to the stack."
+  (interactive "p")
+  (beginning-of-line)
+  (if (mpg123:in-music-list-p)
+      (let ((sb (get-buffer-create mpg123*stack-buffer))
+	    n current (stack "") buffer-read-only
+	    (sw (selected-window)))
+	(save-excursion
+	  (set-buffer sb)
+	  (use-local-map mpg123-mode-map))
+	(while (and (> arg 0) (mpg123:in-music-list-p))
+	  (setq n (mpg123:get-music-number))
+	  (if (and (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
+		   (= (point) mpg123*cur-play-marker))
+	      (setq current t))
+	  (delete-region (point)
+			 (progn (forward-line 1) (point)))
+	  (save-excursion
+	    (set-buffer sb)
+	    (goto-char (point-min))
+	    (if current
+		(progn
+		  (set-marker mpg123*cur-play-marker nil)
+		  (setq mpg123*cur-play-marker (point-marker))
+		  (setq current nil)
+		  (insert (mpg123:format-line n)))
+	      (insert-before-markers (mpg123:format-line n))))
+	  (setq arg (1- arg)))
+	(mpg123:popup-buffer sb)
+	(goto-char (point-min))
+	(select-window sw))))
+
+(defun mpg123-yank-line (arg)
+  "Yank music line from stack buffer."
+  (interactive "p")
+  (beginning-of-line)
+  (if (mpg123:in-music-list-p)
+      (let ((sb (get-buffer-create mpg123*stack-buffer))
+	    (sw (selected-window)) stackw
+	    n buffer-read-only current)
+	(beginning-of-line)
+	(mpg123:popup-buffer sb)
+	(setq stackw (selected-window))
+	(goto-char (point-min))
+	(while (and (setq n (mpg123:get-music-number))
+		    (> arg 0))
+	  (if (and (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
+		   (= (point) mpg123*cur-play-marker))
+	      (setq current t))
+	  (delete-region (point) (progn (forward-line 1) (point)))
+	  (save-excursion
+	    (set-buffer mpg123*buffer)
+	    (if current
+		(progn
+		  (set-marker mpg123*cur-play-marker nil)
+		  (setq mpg123*cur-play-marker (point-marker))
+		  (setq current nil)
+		  (insert (mpg123:format-line n)))
+	      (insert-before-markers (mpg123:format-line n))))
+	  (setq arg (1- arg)))
+	(if (progn (set-buffer sb)
+		   (= (buffer-size) 0))
+	    (progn
+	      (delete-window stackw)
+	      (kill-buffer sb)))
+	(select-window sw))))
+
+(defun mpg123-shuffle ()
+  "Shuffle the music!"
+  (interactive)
+  (message "Shuffle music by...(O)rder, (I)nverse order, (R)andom: ")
+  (let ((c (read-char)) ord (n 0) (l (length mpg123*music-alist))
+	r tmp buffer-read-only (p (point)))
+    (cond
+     ((eq c ?o)
+      (setq n l)
+      (while (> n 0)
+	(setq ord (cons n ord)
+	      n (1- n))))
+     ((eq c ?i)
+      (while (<= (setq n (1+ n)) l)
+	(setq ord (cons n ord))))
+     ((eq c ?r)
+      (random t)
+      (setq ord (make-vector l nil))
+      (while (< n l)
+	(aset ord n (1+ n)) (setq n (1+ n)))
+      (while (>= (setq n (1- n)) 0)
+	(setq r (random l)
+	      tmp (aref ord r))
+	(aset ord r (aref ord n))
+	(aset ord n tmp)))
+     (t (error "Canceled")))
+    (setq n 0)
+    (goto-char (point-min))
+    (if (and mpg123*cur-play-marker
+	     (markerp mpg123*cur-play-marker)
+	     (eq (marker-buffer mpg123*cur-play-marker) (current-buffer)))
+	(set-marker mpg123*cur-play-marker nil))
+    (while (< n l)
+      (if (equal (elt ord n) mpg123*cur-music-number)
+	  (setq mpg123*cur-play-marker (point-marker)))
+      (insert (mpg123:format-line (elt ord n)))
+      (setq n (1+ n)))
+    (delete-region (point) mpg123*end-of-list-marker)
+    (goto-char p)))
+
 (defun mpg123-quit ()
   "Quit"
   (interactive)
@@ -663,14 +825,18 @@ mpg123:
 \\[mpg123-open-new]	Open other directory
 \\[mpg123-increase-repeat-count]	Increase repetition count
 \\[mpg123-decrease-repeat-count]\tDecrease repetition count (-1 for infinity)
+\\[mpg123-shuffle]	Shuffle music list
+\\[mpg123-kill-line]	Kill music line and push onto stack
+\\[mpg123-yank-line]	Yank music line from stack
 \\[mpg123-quit]	Quit
 "
 )))
 
 (defun mpg123:format-line (n)
   (if (stringp n) (setq n (string-to-int n)))
-  (format "%2d %s %s\n"
-	  n mpg123*default-time-string
+  (format "%2d --:--/%s\t %s\n"
+	  n
+	  (or (mpg123:get-music-info n 'length) "--:--")
 	  (mpg123:get-music-info n 'name)))
 
 (defun mpg123-mode ()
@@ -689,9 +855,14 @@ mpg123:
   "Create play-buffer"
   (switch-to-buffer (get-buffer-create mpg123*buffer))
   (setq buffer-read-only nil)
+  (buffer-disable-undo)
   (erase-buffer)
   (setq mpg123*music-alist nil)
   (cd dir) (setq default-directory dir)
+  (save-excursion
+    (set-buffer (get-buffer-create mpg123*stack-buffer))
+    (setq buffer-read-only nil)
+    (erase-buffer))
   (mpg123-mode)
   (let (f (i 1) name)
     (while files
