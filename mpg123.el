@@ -2,10 +2,12 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2004 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Sep 17 11:57:47 2004 on firestorm
-;;; Update count: 1261
+;;; Last modified Fri Sep 17 23:03:02 2004 on firestorm
+;;; Update count: 1262
 
 ;;[News]
+;;	Support very long music.
+;;	Small changes for external add-on's.  eg. mpg123-delete-file.
 ;;	mpg123-display-slider (key bound to ".") introduced.
 ;;	mpg123 now tries to keep slider visible.
 ;;	"I" toggles introduction-quiz mode.
@@ -358,6 +360,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.44  2004/09/17 14:03:13  yuuji
+;; Fixed argument handling in mpg123-delete-file.
+;;
 ;; Revision 1.43  2004/09/17 03:09:04  yuuji
 ;; * Support music longer than 99:59(not tested heavily).
 ;; * Add mpg123-active-p for external add-on's.
@@ -2022,7 +2027,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (delete-region (point) mpg123*end-of-list-marker)
     (goto-char p)))
 
-(defun mpg123-delete-file (optional command)
+(defun mpg123-delete-file (&optional command)
   "Delete audio file on the point.
 When called from function, optional argument COMMAND directly select the job."
   (interactive)
@@ -2031,7 +2036,7 @@ When called from function, optional argument COMMAND directly select the job."
   (let*((n (mpg123:get-music-number)) p c
 	(file (mpg123:get-music-info n 'filename)))
     (if command
-	nil
+	(setq c command)
       (message (mpg123:lang-msg
 		"Delete file?(%s) [Y]es, [L]from list, [N]o"
 		"消してええ?(%s) Y=>よか  L=>曲一覧から  N=>だめ")
