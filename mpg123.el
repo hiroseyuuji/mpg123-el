@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sun Aug  6 00:40:06 2000 on firestorm
-;;; Update count: 665
+;;; Last modified Sun Aug  6 11:26:47 2000 on firestorm
+;;; Update count: 684
 
 ;;[Commentary]
 ;;	
@@ -63,6 +63,34 @@
 ;;	キーコマンドは音楽一覧バッファの末尾に表示されているのでそっちを
 ;;	見てください。
 ;;	
+;;[Playlist]
+;;	
+;;	If you  give `M-x mpg123' a  simple file whose  consists of file
+;;	name list;  one file  name per line,  mpg123.el assumes it  as a
+;;	playlist  file.  All  of mp3  files  listed in  playlist file  a
+;;	incorporated in *mpg123* playing  buffer.  If a line in playlist
+;;	points  to another  playlist file,  file is  parsed recursively.
+;;	There are mainly two ways to create a playlist file.
+;;	
+;;		* Typing `S' in *mpg123* buffer
+;;		* Create directly on the shell;
+;;		  Ex. % ls */*.mp3 > playlist
+;;	
+;;	Because a playlist is very simple, you can edit it manually to
+;;	arrange the order of music list.
+;;	
+;;	M-x mpg123 のあとに、一行に一つMP3ファイルの名前が書かれた普通の
+;;	ファイルを指定するとmpg123.elはそれをプレイリストファイルだとみ
+;;	なし、そこに書かれているMP3ファイル群を *mpg123* 音楽一覧バッファ
+;;	に全て取り込みます。プレイリストファイルを作るには二つの方法があ
+;;	ります。
+;;	
+;;		* 音楽一覧(*mpg123*)バッファで S を押す
+;;		* シェルの上で直接作る
+;;		  【例】 % ls */*.mp3 > playlist
+;;	
+;;	プレイリストファイルはとても単純なので、直接編集して好きな曲順を
+;;	リストを作るのは簡単でしょう。
 ;;	
 ;;[Configuration]
 ;;	
@@ -73,6 +101,8 @@
 ;;	  [Variable]		[Default value/Meaning]
 ;;	  mpg123-command	"mpg123"
 ;;				Command name of mpg123
+;;	  mpg123-command-args	nil
+;;				Argument list to pass mpg123 command
 ;;	  mpg123-mixer-command	"mixer"
 ;;				Command name of mixer(FreeBSD)
 ;;	  mpg123-preserve-playtime t
@@ -82,7 +112,15 @@
 ;;				this variable to `nil'.
 ;;	  mpg123-startup-volume 30
 ;;				Initialize sound volume with this value.
-;;	
+;;	  mpg123-default-repeat	0
+;;				Default number of repetition
+;;	  mpg123-show-help	t
+;;				Whether show help under the music list
+;;				or not
+;;	  mpg123-omit-id3-artist nil
+;;				Whether omit the artist name in ID3
+;;	  mpg123-lazy-check	nil
+;;				Check sound file or not by filename
 ;;	
 ;;	ほぼ mpg123 0.59q に決め打ちという風情なので、あまりいじれるとこ
 ;;	ろ無いけど、上に書いてある変数がいじれます。
@@ -139,21 +177,20 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2000/5現在)。
+;;	下のアドレスまでお願いします(2000/8現在)。
 ;;							yuuji@gentei.org
-;;[Acknowledgement]
+;;[Acknowledgements]
 ;;	
 ;;	Tijs van Bakel, <smoke@casema.net>
 ;;		Reported mpg123 termination problem on mpg123 0.59r on
 ;;		linux 2.2.10.
 ;;	sen_ml@eccosys.com
-;;		Reported problem at playing music number greater than
-;;		100.
+;;		Reported problem at playing music more than 100.
 ;;	Kenichi OKADA, <okada@opaopa.org>
 ;;		Sent a patch of setting sound volume on Solaris/sparc.
 ;;	Takuro Horikawa <takuroho@tky3.3web.ne.jp>
 ;;		Reported running on WinNT.
-;;		Port mixer to Windows.
+;;		Port `mixer command' to Windows.
 ;;		(See http://www3.tky.3web.ne.jp/~takuroho/mpg123.html)
 ;;	TAOKA Satoshi <taoka@infonets.hiroshima-u.ac.jp>
 ;;		Put mpg123.el into FreeBSD ports collection
@@ -175,11 +212,14 @@
 ;;	MOROHOSHI Akihiko <moro@nii.ac.jp>
 ;;		Sent a patch on coding-system detection for XEmacs+emu.el
 ;;	Alex Shinn <foof@debian.org>
-;;		Sent a patch to enable mp3 files in multiple directories.
+;;		Patch to handle mp3 files in multiple directories.
 ;;		Implemented `playlist'.
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.12  2000/08/06 02:27:58  yuuji
+;; Set it default to use hilighting.
+;;
 ;; Revision 1.11  2000/08/05 15:40:57  yuuji
 ;; Revise document.
 ;;
@@ -268,7 +308,7 @@ If want to check by filename, set this variable to filename regexp.
 MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 正規表現を指定する.")
 
-(defvar mpg123*show-help t
+(defvar mpg123-show-help t
   "*Print help summary in mpg123 buffer")
 
 (defvar mpg123-mode-map nil)
@@ -501,9 +541,9 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
   (momentary-string-display "
 ***********************************************************
 Something is wrong with sound device.
-It is seemed that you don't have set up sound device on
+It seemes that you don't have set up sound device on
 this machine, or you already have running some application
-which lock sound device in othersession to this host.
+which locks sound device in other session on this host.
 Anyway, you have to make sure that mpg123 program plays
 mp3 files on your pseudo terminal(xterm, rxvt, etc).
 -- Type SPC to exit ---
@@ -628,7 +668,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
        (< (point) mpg123*end-of-list-marker)))
 
 ;;2000/5/19
-(defvar mpg123*use-face nil)
+(defvar mpg123*use-face t)
 (defvar mpg123*cur-overlay nil
   "Overlay to indicate playing positino")
 (if (and (fboundp 'make-face) mpg123*use-face)
@@ -893,17 +933,21 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
    (file-exists-p file)
    (not (file-directory-p file))
    ;(not (mpg123:sound-p file))
-   (let ((b (set-buffer (get-buffer-create " *mpg123pl*"))))
+   (let ((b (set-buffer (get-buffer-create " *mpg123pl*")))
+	 (PATH_MAX 1024)
+	 (dir (file-name-directory file)))
      (erase-buffer)
-     (insert-file-contents file nil 0 1024)
+     (insert-file-contents file nil 0 PATH_MAX)
      (goto-char (point-min))
      (while (looking-at "\\s *#") (forward-line 1))
      (skip-chars-forward "[ \t]")
      (prog1
 	 (file-exists-p
-	  (buffer-substring
-	   (point)
-	   (progn (end-of-line) (skip-chars-backward "[ \t]") (point))))
+	  (expand-file-name
+	   (buffer-substring
+	    (point)
+	    (progn (end-of-line) (skip-chars-backward "[ \t]") (point)))
+	   dir))
        (kill-buffer b)))))
 
 (defun mpg123-add-new (file)
@@ -914,6 +958,8 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (cond ((file-directory-p file)
          ;; Add all files and playlists in a directory
          (mpg123-add-to-playlist (mpg123:mp3-files-in-dir file)))
+	((mpg123:sound-p file)
+	 (mpg123-add-to-playlist (list file)))
         (;(string-match mpg123-playlist-regexp file)
 	 (mpg123:playlist-p file)
          ;; Add all files in a playlist file
@@ -1237,7 +1283,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 
 (defun mpg123:insert-help ()
   "Insert help string to current buffer."
-  (if mpg123*show-help
+  (if mpg123-show-help
       (insert (substitute-command-keys "
 mpg123:
 \\[mpg123-play-stop]	Play or pause
