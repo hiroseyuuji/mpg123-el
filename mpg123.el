@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2003 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon Apr 28 18:18:13 2003 on firestorm
-;;; Update count: 1110
+;;; Last modified Mon May 26 19:23:14 2003 on firestorm
+;;; Update count: 1124
 
 ;;[News]
 ;;	mpg123-set-point-for-next-song-function, mpg123-format-name-function,
@@ -151,6 +151,8 @@
 ;;				needed or not
 ;;	  mpg123-auto-redraw	Redraw slider when resize window
 ;;	  mpg123-lang		Message language 0=English 1=Japanese
+;;	  mpg123-lazy-slider	Reduce redrawing slider and windows to
+;;				each 1 second
 ;;	
 ;;	あまりいじれるところ無いけど、上に書いてある変数がいじれます。
 ;;	
@@ -274,8 +276,11 @@
 ;;		Reported running on Linux.
 ;;	OHTAKI Naoto <ohtaki@wig.nu>
 ;;		Reported running on Windows98
-;;	MOROHOSHI Akihiko <moro@nii.ac.jp>
+;;	MOROHOSHI Akihiko <moro@remus.dti.ne.jp>
 ;;		Sent a patch on coding-system detection for XEmacs+emu.el
+;;		Fixed the failure of handling multi-byte chars in
+;;		id3v1.1 support.
+;;		Introduce mpg123-lazy-slider.
 ;;	Alex Shinn <foof@debian.org>
 ;;		Patch to handle mp3 files in multiple directories.
 ;;		Implemented `playlist'.
@@ -309,6 +314,11 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.39  2003/05/26 14:36:19  yuuji
+;; Patch by moro@remus.dti.ne.jp;
+;;  Fixed the failure of handling multi-byte chars in id3v1.1 support.
+;;  Introduce mpg123-lazy-slider.
+;;
 ;; Revision 1.38  2003/04/28 09:20:48  yuuji
 ;; mpg123-set-point-for-next-song-function, mpg123-format-name-function,
 ;; mpg123-now-playing, support id3v1.1 (thanks to Rene Kyllingstad)
@@ -520,6 +530,9 @@ and shoud return the string to be displayed.
 曲リスト行の書式を決める関数。
 アーチスト、アルバム、タイトル、トラック、ファイル名
 の5つの引数を受け取り、それらを加工して1行の文字列を返す関数を定義する。")
+(defvar mpg123-lazy-slider nil
+  "*Non-nil for updating slider only once in a second.
+non-nilのときはスライダーを一秒に一回だけ更新する。")
 (defvar mpg123-omit-id3-artist nil
   "*Non-nil for omitting artist name display of ID3 tag.
 non-nilのときID3タグからのアーチスト名表示を省略する。")
@@ -980,10 +993,12 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
       (save-excursion
 	;;(set-buffer mpg123*info-buffer)  ;heavy
 	;;(insert mess)                    ;jobs
+	(let ((update-slider (not mpg123-lazy-slider)))
 	(if (string-match mpg123:time-regexp mess)
 	    (let ((s (substring mess (match-beginning 1) (match-end 1))))
 	      (and (not (string= s mpg123*cur-playtime))
 		   (not mpg123*time-setting-mode)
+		   (setq update-slider t) ;beware! always returns t
 		   (mpg123:update-playtime (setq mpg123*cur-playtime s)))))
 	(if (string-match mpg123:frame-regexp mess)
 	    (let (c)
@@ -993,10 +1008,13 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 					(match-beginning 1)
 					(match-end 1))
 			     mpg123*cur-music-file))
-	      (and mpg123-auto-redraw
-		   (/= (window-width) mpg123*window-width)
-		   (mpg123:draw-slider-help nil))
-	      (mpg123:slider-check))))))
+	      (if (or update-slider
+		      (= mpg123*cur-playframe mpg123*cur-total-frame))
+		  (progn ;redraw & slider only if it's needed
+		    (and mpg123-auto-redraw
+			 (/= (window-width) mpg123*window-width)
+			 (mpg123:draw-slider-help nil))
+		    (mpg123:slider-check)))))))))
 
 (defsubst mpg123:slider-check-1 ()
   (let ((c (/ (* (mpg123:window-width)
@@ -1924,17 +1942,24 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 	    (mpg123:squeeze-spaces-buffer)
 	    (setq artist (buffer-string))
 	    (erase-buffer)
-	    (insert-file-contents file nil (- sz 65) sz)
-	    (setq album (buffer-substring 1 (1- (or (search-forward "\000" 31 t) 32))))
+	    (insert-file-contents file nil (- sz 65) (- sz 35))
+	    (mpg123:squeeze-spaces-buffer)
+	    (setq album (buffer-string))
+	    (erase-buffer)
+	    (insert-file-contents file nil (- sz 3) sz)
 	    ;; id3v1.1 last byte of comment is tracknum (if prev byte is null):
-	    (let ((track (string-to-char (buffer-substring 64 65))))
-	      (if (and (= (string-to-char (buffer-substring 63 64)) ?\000)
+	    (let ((track (char-after 2)))
+	      (if (and (= (char-after 1) ?\000)
 		       (not (= track ?\000)))
-		  (setq tracknum (int-to-string (char-int track)))))
+		  (setq tracknum (format "%d" track))))
+
 	    ;; common hack: comment is "Track num" 
 	    (if tracknum
 		nil
-	      (goto-char 35)
+	      (erase-buffer)
+	      (mpg123:insert-raw-file-contents
+	       file nil (- sz 31) (- sz 1)) ;ID3v1.1
+	      (mpg123:squeeze-spaces-buffer)
 	      (if (looking-at "Track \\([0-9]+\\)")
 		  (setq tracknum
 			(buffer-substring (match-beginning 1) (match-end 1)))))
