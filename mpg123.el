@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Jan 19 13:40:41 2001 on buell
-;;; Update count: 811
+;;; Last modified Tue Jan 30 12:35:52 2001 on firestorm
+;;; Update count: 815
 
 ;;[Commentary]
 ;;	
@@ -239,6 +239,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.20  2001/01/30 03:35:54  yuuji
+;; (Win)convert music filename to dos file name for music over shared folder
+;;
 ;; Revision 1.19  2001/01/19 04:41:37  yuuji
 ;; Fix the invalid 'cond form.
 ;;
@@ -852,6 +855,9 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
       (if (fboundp 'code-convert-string)
 	  (setq music (code-convert-string
 		       music mpg123-process-coding-system *internal*)))
+      (and (eq mpg123-system-type 'nt)		;convert to dos filename for
+	   (fboundp 'unix-to-dos-file-name)	;music over shared folder(Win)
+	   (setq music (unix-to-dos-file-name music)))
       (setq mpg123*time-setting-mode nil)
       (if mpg123*use-face
 	  (let ((frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
