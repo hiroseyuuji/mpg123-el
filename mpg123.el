@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2001 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Wed Feb 21 12:30:29 2001 on firestorm
-;;; Update count: 820
+;;; Last modified Fri Feb 23 14:07:21 2001 on buell
+;;; Update count: 836
 
 ;;[Commentary]
 ;;	
@@ -241,6 +241,12 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.22  2001/02/23 05:20:12  yuuji
+;; `>' at the end of music list obeys the repetition counter.
+;; Music list in a stack doesn't appear in the result of shuffle any more.
+;; Shuffle preserves highlighted line any time.
+;; Now nil for mpg123-preserve-playtime plays a music from the beginning.
+;;
 ;; Revision 1.21  2001/02/21 03:41:10  yuuji
 ;; Support for OpenBSD is confirmed.
 ;;
@@ -836,6 +842,9 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	(and mpg123*slider-overlay
 	     (delete-overlay mpg123*slider-overlay))))
   (setq mpg123*cur-play-marker (point-marker))
+  (if (and (>= (point) mpg123*end-of-list-marker)
+	   (mpg123:repeat-check))
+      (goto-char (point-min)))
   (skip-chars-forward " ")
   (if (or (not (looking-at "[0-9]"))
 	  (not (mpg123:in-music-list-p)))
@@ -851,6 +860,7 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
        (startframe (setq mpg123*cur-start-frame startframe))
        ((or (looking-at mpg123*default-time-string))
 	(setq mpg123*cur-start-frame "0"))
+       ((null mpg123-preserve-playtime) (setq mpg123*cur-start-frame "0"))
        (t
 	(let ((time (buffer-substring
 		     (point)
@@ -1221,6 +1231,8 @@ percentage in the length of the song etc.
     (switch-to-buffer buffer))))
 
 (defvar mpg123*stack-buffer " *mpg123 stack*")
+(defvar mpg123*music-in-stack nil "List of the music in the stack")
+
 (defun mpg123-kill-line (arg)
   "Kill current music line and move it to the stack."
   (interactive "p")
@@ -1234,10 +1246,11 @@ percentage in the length of the song etc.
 	  (use-local-map mpg123-mode-map))
 	(while (and (> arg 0) (mpg123:in-music-list-p))
 	  (setq n (mpg123:get-music-number))
-	  (if (and (markerp mpg123*cur-play-marker)
-		   (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
-		   (= (point) mpg123*cur-play-marker))
-	      (setq current t))
+	  (setq current
+		(and (markerp mpg123*cur-play-marker)
+		     (eq (marker-buffer mpg123*cur-play-marker)
+			 (current-buffer))
+		     (= (point) mpg123*cur-play-marker)))
 	  (delete-region (point)
 			 (progn (forward-line 1) (point)))
 	  (save-excursion
@@ -1253,6 +1266,7 @@ percentage in the length of the song etc.
 		      (move-overlay
 		       mpg123*cur-overlay p (point) (current-buffer))))
 	      (insert-before-markers (mpg123:format-line n))))
+	  (setq mpg123*music-in-stack (cons n mpg123*music-in-stack))
 	  (setq arg (1- arg)))
 	(mpg123:popup-buffer sb)
 	(goto-char (point-min))
@@ -1281,10 +1295,12 @@ percentage in the length of the song etc.
 	(goto-char (point-min))
 	(while (and (setq n (mpg123:get-music-number))
 		    (> arg 0))
-	  (if (and (markerp mpg123*cur-play-marker)
-		   (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
-		   (= (point) mpg123*cur-play-marker))
-	      (setq current t))
+	  (or (eq (car mpg123*music-in-stack) n)
+	      (error "Stack buffer is obsolete.  Please reopen this directory."))
+	  (setq current
+		(and (markerp mpg123*cur-play-marker)
+		     (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
+		     (= (point) mpg123*cur-play-marker)))
 	  (delete-region (point) (progn (forward-line 1) (point)))
 	  (save-excursion
 	    (set-buffer mpg123*buffer)
@@ -1298,6 +1314,7 @@ percentage in the length of the song etc.
 		      (move-overlay
 		       mpg123*cur-overlay p (point) (current-buffer))))
 	      (insert-before-markers (mpg123:format-line n))))
+	  (setq mpg123*music-in-stack (cdr mpg123*music-in-stack))
 	  (setq arg (1- arg)))
 	(if (progn (set-buffer sb)
 		   (= (buffer-size) 0))
@@ -1319,7 +1336,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
   (message "Shuffle music by...(O)rder, (I)nverse order, (R)andom: ")
   (let ((c (or method (read-char)))
 	ord (n 0) (l (length mpg123*music-alist))
-	r tmp buffer-read-only (p (point))
+	r tmp buffer-read-only (p (point)) currentp
 	(number-list (sort (mapcar (function (lambda (s) (car s)))
 				   mpg123*music-alist)
 			   '<)))
@@ -1333,7 +1350,6 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 	(setq ord (cons (nth n number-list) ord)
 	      n (1+ n))))
      ((eq c ?r)
-      (random t)
       (setq ord (make-vector l nil))
       (while (< n l)
 	(aset ord n (nth n number-list)) (setq n (1+ n)))
@@ -1350,9 +1366,20 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 	     (eq (marker-buffer mpg123*cur-play-marker) (current-buffer)))
 	(set-marker mpg123*cur-play-marker nil))
     (while (< n l)
-      (if (equal (elt ord n) mpg123*cur-music-number)
-	  (setq mpg123*cur-play-marker (point-marker)))
-      (insert (mpg123:format-line (elt ord n)))
+      (if (memq (elt ord n) mpg123*music-in-stack)
+	  nil
+	(if (setq currentp (equal (elt ord n) mpg123*cur-music-number))
+	    (progn
+	      (setq mpg123*cur-play-marker (point-marker))
+	      (if (overlayp mpg123*cur-overlay)
+		  (move-overlay mpg123*cur-overlay
+				(point)
+				(progn
+				  (insert (mpg123:format-line (elt ord n)))
+				  (point))
+				(current-buffer))
+		(insert (mpg123:format-line (elt ord n)))))
+	  (insert (mpg123:format-line (elt ord n)))))
       (setq n (1+ n)))
     (delete-region (point) mpg123*end-of-list-marker)
     (goto-char p)))
@@ -1569,6 +1596,7 @@ the music will immediately move to that position.
 
 (defun mpg123:create-buffer (files)
   "Create play-buffer"
+  (random t)				;for mpg123-shuffle
   (switch-to-buffer (get-buffer-create mpg123*buffer))
   (setq buffer-read-only nil)
   (buffer-disable-undo)
@@ -1796,6 +1824,7 @@ the music will immediately move to that position.
                 (error "Not an mp3 or playlist: %s" file)))))
     (mpg123:create-buffer files)
     (message "Let's listen to the music. Type SPC to start.")
+    (setq mpg123*music-in-stack nil)
     (run-hooks 'mpg123-hook)))
 
 (if (and mpg123-process-coding-system (symbolp mpg123-process-coding-system))
