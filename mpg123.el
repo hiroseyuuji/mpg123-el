@@ -2,9 +2,12 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2001 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Feb 23 14:07:21 2001 on buell
-;;; Update count: 836
+;;; Last modified Fri Feb 23 14:38:13 2001 on buell
+;;; Update count: 841
 
+;;[News]
+;;	Key binding to Delete-file is changed from `C-d' to `D'.
+;;	
 ;;[Commentary]
 ;;	
 ;;	This package is a front-end program to mpg123 audio player.
@@ -168,14 +171,14 @@
 ;;	such case, mpg123.el cannot  detect that condition.  If you come
 ;;	to see such behavior, please pause and restart player by SPC key.
 ;;	
-;;	たまにmpg123が動いてはいるものの音を出さなくなってしまうことがあ
-;;	ります。そのような挙動をmpg123.elは検出できないので、そうなった
-;;	らSPCで一旦止めて動かし直してください。Emacs19ベースのMuleでは複
-;;	雑な理由により別フレームで演奏中に次の曲に進むと、次の曲に移った
-;;	直後のキーを演奏用バッファに取られてしまい、なおかつ演奏時間の更
-;;	新が(みかけ上)次にキー入力するまで止まってしまいます。そうなって
-;;	しまう確率が下がるような工夫はしてみましたが根本的解決には至りま
-;;	せんでした。
+;;	たまにmpg123コマンドが動いてはいるものの音を出さなくなってしまう
+;;	ことがあります。そのような挙動をmpg123.elは検出できないので、そ
+;;	うなったらSPCで一旦止めて動かし直してください。Emacs19ベースの
+;;	Muleでは複雑な理由により別フレームで演奏中に次の曲に進むと、次の
+;;	曲に移った直後のキーを演奏用バッファに取られてしまい、なおかつ演
+;;	奏時間の更新が(みかけ上)次にキー入力するまで止まってしまいます。
+;;	そうなってしまう確率が下がるような工夫はしてみましたが根本的解決
+;;	には至りませんでした。
 ;;	
 ;;	Play/Stop control against the  music in the stack buffer doesn't
 ;;	work.   Although  it is  feasible,  the  feature isn't  actually
@@ -188,7 +191,7 @@
 ;;	defects caused by this software.  You can freely modify this
 ;;	program for your convenience.  But if you want to publish
 ;;	modified program, please tell me before announcement.  Take it
-;;	easy to write me comments, bug-reports.
+;;	easy to write me comments and bug-reports.
 ;;							yuuji@gentei.org
 ;;	
 ;;	このプログラムはフリーソフトウェアとして配布します。このプログラ
@@ -238,9 +241,15 @@
 ;;		Made dired-dd-mpg123.
 ;;	Serge Arsenault <boggles@openface.ca>
 ;;		Sent information on OpenBSD.
+;;	Toni Ronkko <tronkko@hytti.uku.fi>
+;;		Many suggestions.
+;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.23  2001/02/23 05:39:26  yuuji
+;; Delete-file key-binding is changed from `C-d' to `D' for trivial reason..
+;;
 ;; Revision 1.22  2001/02/23 05:20:12  yuuji
 ;; `>' at the end of music list obeys the repetition counter.
 ;; Music list in a stack doesn't appear in the result of shuffle any more.
@@ -405,7 +414,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "y" 'mpg123-yank-line)
 (define-key mpg123-mode-map "s" 'mpg123-shuffle)
 (define-key mpg123-mode-map "S" 'mpg123-save-playlist)
-(define-key mpg123-mode-map "\C-d" 'mpg123-delete-file)
+(define-key mpg123-mode-map "D" 'mpg123-delete-file)
 (define-key mpg123-mode-map "E" 'id3-edit)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
 (define-key mpg123-mode-map "Q" 'mpg123-quit-yes)
