@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Sep 21 21:55:01 2002 on firestorm
-;;; Update count: 1009
+;;; Last modified Sat Sep 21 22:09:47 2002 on firestorm
+;;; Update count: 1010
 
 ;;[News]
 ;;	Support OggVorbis (thanks to Andreas Fuchs <asf@acm.org>)
@@ -293,6 +293,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.31  2002/09/21 13:10:16  yuuji
+;; Fixed documentation for mpg123:ogg123-peek-tag.
+;;
 ;; Revision 1.30  2002/09/21 12:56:27  yuuji
 ;; Picking ogg's comment starts from file offset 84.
 ;; Fixed by Akinori MUSHA <knu@iDaemons.org>.
@@ -1834,6 +1837,14 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 (defun mpg123:ogg123-peek-tag (file)
   "Peek ogg comment area.
 cf. NetBSD:/usr/share/misc/magic
+# A kludge to read the vendor string.  It's a counted string, not a
+# libVorbis is the only one existing currently, so I detect specifically
+# it.  The interesting value is the cvs date (8 digits decimal).
+# Post-RC1 Ogg files have the second header packet (and thus the version)
+# in a different place, so we must use an indirect offset.
+>>>(84.b+85)            string          \x03vorbis
+>>>>(84.b+96)           string/c        Xiphophorus\ libVorbis\ I       \b, crea
+ :::
 # Then come the comments, again length-counted (and number-counted).
 # Some looping constructs and registers would allow reading them but now
 # it's impossible.  However we can print the number of comments present
