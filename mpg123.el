@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sun Aug  6 00:20:13 2000 on firestorm
-;;; Update count: 664
+;;; Last modified Sun Aug  6 00:40:06 2000 on firestorm
+;;; Update count: 665
 
 ;;[Commentary]
 ;;	
@@ -43,7 +43,7 @@
 ;;	direcotry.  If you want to listen, exec Emacs and type:
 ;;	
 ;;		M-x mpg123 RET
-;;		SomeMP3DirectoryName RET
+;;		SomeMP3DirectoryName (or playlist file) RET
 ;;	
 ;;	Then you will get the music  list in the directory.  Type SPC to
 ;;	start the  music.  All key bindings  are shown at  the bottom of
@@ -56,7 +56,7 @@
 ;;	ら、まずEmacsを起動し、
 ;;	
 ;;		M-x mpg123 ぺし
-;;		ディレクトリ名 ぺし
+;;		ディレクトリ名 (またはプレイリストファイル名) ぺし
 ;;	
 ;;	と打ちます。と、そのディレクトリにある音楽ファイル一覧が出て来る
 ;;	ので、聞きたい曲に合わせてSPCを打つと演奏が始まります。その他の
@@ -180,6 +180,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.11  2000/08/05 15:40:57  yuuji
+;; Revise document.
+;;
 ;; Revision 1.10  2000/08/05 15:37:50  yuuji
 ;; Handle mp3 files in multiple directories.
 ;; Playlist support.
