@@ -2,10 +2,15 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2004 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Wed Feb 11 00:56:15 2004 on firestorm
-;;; Update count: 1148
+;;; Last modified Thu Feb 12 15:40:08 2004 on firestorm
+;;; Update count: 1252
 
 ;;[News]
+;;	mpg123-display-slider (key bound to ".") introduced.
+;;	mpg123 now tries to keep slider visible.
+;;	"I" toggles introduction-quiz mode.
+;;	mpg123-save-playlist ("S") now saves all marked positions.
+;;	
 ;;	mpg123-set-point-for-next-song-function, mpg123-format-name-function,
 ;;	mpg123-now-playing, support id3v1.1 (thanks to rene)
 ;;	
@@ -149,6 +154,16 @@
 ;;	  mpg123-need-slider	t on color display, else nil
 ;;				Whether the playing position slider is
 ;;				needed or not
+;;	  mpg123-display-slider	t
+;;				For the buffer of large number of playlist,
+;;				try to keep playing position slider visible
+;;				or not.  'always for this varialbe always
+;;				splits windows to make small window for
+;;				slider.  Other non-nil values split window
+;;				only if necessary. But if you run
+;;				mpg123-mode in single frame, it becomes 
+;;				annoying because mpg123-display-slider brakes
+;;				window configuration.
 ;;	  mpg123-auto-redraw	Redraw slider when resize window
 ;;	  mpg123-lang		Message language 0=English 1=Japanese
 ;;	  mpg123-lazy-slider	Reduce redrawing slider and windows to
@@ -208,6 +223,31 @@
 ;;	You may have to create functions as follows;
 ;;	
 ;;	mpg123:foo-p, mpg123:foo123-peek-tag
+;;	
+;;[Introduction-Quiz mode]
+;;	
+;;	When enable mpg123-introduction-quiz-mode by typing "I",  mpg123
+;;	always stops at marked position in order to wait until audience
+;;	give an answer.
+;;	
+;;	To   prepare   introduction-quiz,   you   shoulde   mark   every
+;;	`song-starting' position previously, and save the mpg123 playing
+;;	buffer  by typing "S".   At the  day of  introduction-quiz game,
+;;	load saved  playlist and get  music list in  mpg123-buffer.  All
+;;	you have to do is to  play music until someone hit the answering
+;;	button.  Typing `r' plays the body part of music.
+;;	
+;;	イントロクイズをするには……
+;;	まず、
+;;	全ての曲リストをmpg123バッファにロードします。そして、全ての曲に
+;;	ついて歌い始めの位置を 'm' でマークしましょう。全てマーク付けが
+;;	完了したら 'S' でプレイリストを保存します。イントロクイズ当日、
+;;	クイズ作成者のあなたは 'I' をタイプしてイントロクイズモードにし
+;;	ておきます。すると歌い始めの直前でmpg123は自動的に演奏を止めます。
+;;	'r' をおすと歌い始め部分から再生します。これで大体イントロクイズ
+;;	の進行ができるでしょう。それ以前に mpg123.el の操作にしっかり慣
+;;	れておくのも重要です。
+;;	
 ;;	
 ;;[Bugs]
 ;;	
@@ -317,6 +357,12 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.42  2004/02/12 07:09:31  yuuji
+;; mpg123-display-slider (key bound to ".") introduced.
+;; mpg123 now tries to keep slider visible.
+;; "I" toggles introduction-quiz mode.
+;; mpg123-save-playlist ("S") now saves all marked positions.
+;;
 ;; Revision 1.41  2004/02/10 15:56:22  yuuji
 ;; mpg123:draw-slider-help must always create mpg123*indicator-overlay.  Fixed.
 ;; mpg123:window-width must check window-width of mpg123*buffer.  Fixed.
@@ -518,7 +564,9 @@ MP3からID3を取得するための関数")
 (defvar mpg123-set-point-for-next-song-function nil
   "*Return non-nil if it has set the point in the playlist for the next song to be played.
 Called when changing songs to allow playing in non-playlist order.
-1曲終わったときに次の曲の位置にポイントを動かす関数.")
+1曲終わったときに次の曲の位置にポイントを動かす関数.
+プレイリストの並びとは違う再生順序にしたいときに、
+ポイントを移動する関数を定義してその関数名をこの変数に入れよう。")
 (defvar mpg123-startup-volume 30
   "*Default sound volume at startup of this program.
 mpg123.el初回起動時の音量のデフォルト値.")
@@ -595,6 +643,8 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "E" 'mpg123-id3-edit)
 (define-key mpg123-mode-map "W" 'mpg123-what-file)
 (define-key mpg123-mode-map "g" 'mpg123-goto-current-line)
+(define-key mpg123-mode-map "." 'mpg123-display-slider)
+(define-key mpg123-mode-map "I" 'mpg123-introduction-quiz-mode)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
 (define-key mpg123-mode-map "Q" 'mpg123-quit-yes)
 (if (and window-system)
@@ -814,7 +864,8 @@ If optional argument PATTERN given, search it(tentative)."
 			    (throw 'found t))
 			(goto-char e0))
 		    (while (> (skip-chars-forward skipchars) 0) ;Scan `0xff'
-		      (if (and (char-after (1+ (point)))
+		      (if (and (equal (char-after (point)) ?\xFF)
+			       (char-after (1+ (point)))
 			       (= (logand (char-after (1+ (point)))
 					  ?\xF0) ?\xF0))
 			  (throw 'found t))))))
@@ -1008,27 +1059,35 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	;;(set-buffer mpg123*info-buffer)  ;heavy
 	;;(insert mess)                    ;jobs
 	(let ((update-slider (not mpg123-lazy-slider)))
-	(if (string-match mpg123:time-regexp mess)
-	    (let ((s (substring mess (match-beginning 1) (match-end 1))))
-	      (and (not (string= s mpg123*cur-playtime))
-		   (not mpg123*time-setting-mode)
-		   (setq update-slider t) ;beware! always returns t
-		   (mpg123:update-playtime (setq mpg123*cur-playtime s)))))
-	(if (string-match mpg123:frame-regexp mess)
-	    (let (c)
-	      (setq mpg123*cur-playframe
-		    (funcall mpg123*convert-frame-function
-			     (substring mess
-					(match-beginning 1)
-					(match-end 1))
-			     mpg123*cur-music-file))
-	      (if (or update-slider
-		      (= mpg123*cur-playframe mpg123*cur-total-frame))
-		  (progn ;redraw & slider only if it's needed
-		    (and mpg123-auto-redraw
-			 (/= (mpg123:window-width) mpg123*window-width)
-			 (mpg123:draw-slider-help nil))
-		    (mpg123:slider-check)))))))))
+	  (if (string-match mpg123:time-regexp mess)
+	      (let ((s (substring mess (match-beginning 1) (match-end 1))) mp)
+		(and (not (string= s mpg123*cur-playtime))
+		     (not mpg123*time-setting-mode)
+		     (setq update-slider t) ;beware! always returns t
+		     (progn		;care intro-quiz mode
+		       (mpg123:update-playtime (setq mpg123*cur-playtime s))
+		       (and (eq mpg123-introduction-quiz-mode t)
+			    (setq mp (mpg123:get-music-info
+				      mpg123*cur-music-number 'marktime))
+			    (string= s (mpg123:add-time-string mp -1))
+			    (progn
+			      (set-buffer mpg123*buffer)
+			      (mpg123:kill-current-music)))))))
+	  (if (string-match mpg123:frame-regexp mess)
+	      (let (c)
+		(setq mpg123*cur-playframe
+		      (funcall mpg123*convert-frame-function
+			       (substring mess
+					  (match-beginning 1)
+					  (match-end 1))
+			       mpg123*cur-music-file))
+		(if (or update-slider
+			(= mpg123*cur-playframe mpg123*cur-total-frame))
+		    (progn	    ;redraw & slider only if it's needed
+		      (and mpg123-auto-redraw
+			   (/= (mpg123:window-width) mpg123*window-width)
+			   (mpg123:draw-slider-help nil))
+		      (mpg123:slider-check)))))))))
 
 (defsubst mpg123:slider-check-1 ()
   (let ((c (/ (* (mpg123:window-width)
@@ -1099,7 +1158,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 (defun mpg123:time2frame (timestr &optional filename)
   "Convert time string (mm:ss) to frame number.(0.026s/f)"
   (setq filename (or filename mpg123*cur-music-file))
-  (string-match "\\(..\\):\\(..\\)" timestr)
+  (string-match "\\(..?\\):\\(..\\)" timestr)
   (let*((m (string-to-number
 	    (substring timestr (match-beginning 1) (match-end 1))))
 	(s (string-to-number
@@ -1172,6 +1231,17 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 (defvar mpg123-need-slider mpg123*use-face
   "*Need slider in the delimiter line which indicates playing position.
 一覧の下の境界線領域に、現在曲の再生位置を示すスライダーが要るかどうか。")
+(defvar mpg123-display-slider mpg123-need-slider
+  "*Display the slider in visible position or not.
+'always displays slider line in the next small window.
+Other non-nil value check the current visibility of slider line and
+split window to display slider if not visible at the time.  Do nothing
+if slider is already visible.
+現在曲再生位置表示スライダーを見えるようにするかを決定する。
+この値が 'always なら、必ずスライダー専用の小さいウィンドウを作って
+そこに表示。
+'always 以外の Non-nil の値なら一曲の演奏開始時点でスライダーが見えていなければ
+ウィンドウ分割し、見えていれば何もしない。")
 
 (defun mpg123:play (&optional startframe)
   "Play mp3 on current line."
@@ -1180,6 +1250,9 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
     (buffer-disable-undo)
     (erase-buffer))
   (beginning-of-line)
+  (if (and mpg123-introduction-quiz-mode
+	   (or (null startframe) (= (string-to-int startframe) 0)))
+      (setq mpg123-introduction-quiz-mode t)) ;if t, stop at marked position
   (if (and mpg123*cur-play-marker
 	   (markerp mpg123*cur-play-marker))
       (set-marker mpg123*cur-play-marker nil))
@@ -1278,7 +1351,9 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	  (message "%s %s.."
 		   mpg123*cur-music-number
 		   (mpg123:get-music-info mpg123*cur-music-number 'name)))
-      (set-process-sentinel p 'mpg123:sentinel))))
+      (set-process-sentinel p 'mpg123:sentinel)
+      ;;display slider is little bit heavy, doit after starting process
+      (mpg123-display-slider))))
 
 (defun mpg123:sure-kill (p)
   "Waiting process to be killed."
@@ -1438,6 +1513,22 @@ percentage in the length of the song etc.
 	     mpg123*cur-playtime
 	     (substitute-command-keys "\\[mpg123-refrain]"))))
 
+(defvar mpg123-introduction-quiz-mode nil
+  "Music introduction quiz mode")
+(defun mpg123-introduction-quiz-mode (&optional arg)
+  "Toggle intro-quiz mode"
+  (interactive "P")
+  (setq mpg123-introduction-quiz-mode
+	(if (or (and (numberp arg)
+		     (> arg 0))
+		(and
+		 (not (and (numberp arg) (< arg 1)))
+		 (not mpg123-introduction-quiz-mode)))
+	    t))
+  (message "%s %s"
+	   (mpg123:lang-msg "Introduction-quiz mode" "イントロクイズモード")
+	   (if mpg123-introduction-quiz-mode "ON" "OFF")))
+
 (defun mpg123-refrain ()
   "Refrain from marked position."
   (interactive)
@@ -1445,6 +1536,10 @@ percentage in the length of the song etc.
     (if frame
 	(progn
 	  (mpg123:kill-current-music)
+	  (if mpg123-introduction-quiz-mode
+	      ;; mpg123-introduction-quiz-mode is number, do not stop at
+	      ;; marked position
+	      (setq mpg123-introduction-quiz-mode 1))
 	  (mpg123:play
 	   (mpg123:get-music-info mpg123*cur-music-number 'mark)))
       (message (mpg123:lang-msg
@@ -1466,6 +1561,16 @@ percentage in the length of the song etc.
 		"No mark set for music#%d"
 		"この曲は位置記録してないのじゃが...")
 	       mpg123*cur-music-number))))
+
+(defun mpg123:add-time-string (time seconds)
+  (if (string-match "\\([0-9]+\\):\\([0-9]+\\)" time)
+      (let ((m (string-to-int
+		(substring time (match-beginning 1) (match-end 1))))
+	    (s (string-to-int
+		(substring time (match-beginning 2) (match-end 2))))
+	    tm)
+	(setq tm (mpg123:add-time m s -1))
+	(format "%02d:%02d" (car tm) (cdr tm)))))
 
 (defun mpg123:add-time (m s add &optional max)
   (let ((x (max 0 (+ (* m 60) s add))))
@@ -1594,7 +1699,8 @@ percentage in the length of the song etc.
        (prog1
 	   (let ((name(buffer-substring
 		       (point)
-		       (progn (end-of-line)
+		       (progn (re-search-forward "///\\|$")
+			      (goto-char (match-beginning 0))
 			      (skip-chars-backward "[ \t\r]") (point)))))
 	     (and
 	      (file-exists-p (expand-file-name name dir))
@@ -1761,6 +1867,82 @@ percentage in the length of the song etc.
 	      (delete-backward-char 1))) ;dirty hack
 	)))
 
+(defun mpg123:display-slider-sub ()
+  (if nil nil
+    (let ((window-min-height 2)
+	  (height (if (featurep 'xemacs) 4 3)))
+      (split-window nil (- (window-height) height))
+      (set-window-start (next-window)
+			(overlay-start mpg123*indicator-overlay)))))
+
+(defun mpg123:delete-windows (windows)
+  (while windows
+    (delete-window (car windows))
+    (setq windows (cdr windows))))
+
+(defun mpg123-display-slider ()
+  "Show up slidebar in the next window of mpg123 buffer itself."
+  (interactive)
+  (let*((selw (selected-window))
+	(cb (current-buffer))
+	(mpgw (get-buffer-window mpg123*buffer t))
+	(mpgf (window-frame mpgw))
+	mpgwinlist nowvisible needed-lines numlines (numwin 1)
+	w redrawp (i 300))
+    (unwind-protect
+	(if (or (null mpgw)			;if no mpg123 buffer is visible
+		(null mpg123-display-slider)
+		(null mpg123-need-slider)
+		(null mpg123*cur-play-marker))
+	    nil				;no need to show, maybe
+	  ;(select-frame mpgf)
+	  (select-window mpgw)
+	  (setq redrawp (not (pos-visible-in-window-p mpg123*cur-play-marker)))
+	  (goto-char mpg123*cur-play-marker)
+	  (if redrawp
+	      (set-window-start
+	       nil (save-excursion (forward-line -1) (point))))
+	  (sit-for 0)
+	  ;;(while (and (not (pos-visible-in-window-p (point)))
+	  ;;	      (> i 0))		; workaround for emacs-21.[123]
+	  ;;  (sit-for 0.1)
+	  ;;  (setq i (1- i)))
+	  (setq nowvisible (pos-visible-in-window-p
+			    (overlay-start mpg123*indicator-overlay))
+		numlines (window-height)
+		needed-lines (1+ (count-lines
+				  (point-min)
+				  (overlay-start mpg123*indicator-overlay))))
+	  ;; count mpg123*buffer in this frame
+	  (while (not (eq (setq w (next-window w)) mpgw))
+	    (if (and (not (eq mpgw w))
+		     (eq (window-buffer w)
+			 (get-buffer mpg123*buffer)))
+		(setq numwin (1+ numwin)
+		      numlines (window-height w)
+		      mpgwinlist (cons w mpgwinlist))))
+
+	  (cond
+	   ((< needed-lines numlines)	;window-height is enough
+	    (if (> numwin 1)		;delete other mpg123-window
+		(mpg123:delete-windows mpgwinlist)))
+	   ((eq mpg123-display-slider 'always)
+	    (if (> numwin 1)
+		nil
+	      (mpg123:display-slider-sub)))
+	   (t
+	    ;; mpg123*buffer window is selected here.
+	    (cond
+	     (nowvisible
+	      (if (> numwin 1)
+		  (mpg123:delete-windows mpgwinlist)))
+	     ((= numwin 1)
+	      (mpg123:display-slider-sub))))))
+      ;; for XEmacs, select previous window
+      (focus-frame (window-frame selw))
+      (select-window selw)
+      (sit-for 0))))
+
 (defun mpg123-shuffle (&optional method)
   "Shuffle the music!
 From Lisp program, you can specify one of order/Inverse/Random by
@@ -1885,27 +2067,45 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (message "")
     (nreverse mp3s)))
 
+(fset 'mpg123:buffer-substring
+      (if (fboundp 'buffer-substring-no-properties)
+	  'buffer-substring-no-properties
+	'buffer-substring))
+
 (defun mpg123:mp3-files-in-list1 (file)
   (save-excursion
     (let ((buf (find-file-noselect file))
-          (dir (file-name-directory file)) f mp3s)
+          (dir (file-name-directory file)) f m0 mp3s marktime)
       (put 'mpg123:mp3-files-in-list 'parsed
 	   (cons (cons (expand-file-name file) nil)
 		 (get 'mpg123:mp3-files-in-list 'parsed)))
       (set-buffer buf)
       (goto-char (point-min))
       (while (not (eobp))
-        (and (looking-at "^[ \t]*\\(.*[^ \t\n\r]\\)[ \t\n\r]*$")
-             (setq f (expand-file-name
-                      (buffer-substring (match-beginning 1)
-                                        (match-end 1))
-                      dir))
+	(skip-chars-forward " \t")
+	(setq f (buffer-substring
+		 (point)
+		 (progn
+		   (re-search-forward "\\(///\\)\\|$" nil t)
+		   (setq m0 (match-beginning 0))
+		   (setq marktime
+			 (if (match-beginning 1)
+			     (progn
+			       (looking-at "[0-9:]+")
+			       (mpg123:buffer-substring
+				(match-beginning 0) (match-end 0)))))
+		   (goto-char m0)
+		   (skip-chars-backward " \t")
+		   (point))))
+		   
+        (and f ;;(looking-at "^[ \t]*\\(.*[^ \t\n\r]\\)[ \t\n\r]*$")
+             (setq f (expand-file-name f dir))
              (message "Inspect file %s..." f)
              (not (file-directory-p f))
              (file-readable-p f)
 	     (cond
 	      ((mpg123:sound-p f)
-	       (setq mp3s (cons f mp3s)))
+	       (setq mp3s (cons (if marktime (cons f marktime) f) mp3s)))
 	      ((and
 		(not (assoc (expand-file-name f)
 			    (get 'mpg123:mp3-files-in-list 'parsed)))
@@ -2126,9 +2326,9 @@ mpg123:
 \\[mpg123-backward-10]	" (m "Backard 10 sec" "10秒戻す") "
 \\[mpg123-next-line]	" (m "Move to next line" "次の行へ")"
 \\[mpg123-prev-line]	" (m "Move to previous line" "前の行へ") "
-\\[mpg123-prev-line]	" (m "Move to previous line" "前の行へ") "
 \\[mpg123-goto-current-line]	" (m "Go to current music line" "演奏曲行へ") "
 \\[mpg123-volume-decrease]	" (m "Volume down" "音量減少") "
+\\[mpg123-volume-increase]	" (m "Volume up" "音量増加") "
 \\[mpg123-open-new]	" (m "Open other directory or playlist file"
 			     "別のディレクトリ(またはプレイリスト)を開く") "
 \\[mpg123-add-new]	" (m "Add other directory or playlist file"
@@ -2140,10 +2340,15 @@ mpg123:
 \\[mpg123-decrease-repeat-count]\t" (m "Decrease repetition count (-1 for infinity)"
 				       "繰り返し数を減少(-1で無限回)") "
 \\[mpg123-shuffle]	" (m "Shuffle music list" "再生リストのシャッフル") "
+\\[mpg123-delete-file]	" (m "Delete music file" "曲ファイルの削除") "
+\\[mpg123-display-slider]	" (m "Display playing position indicator" "演奏位置表示スライダーを見せる") "
 \\[mpg123-kill-line]	" (m "Kill music line and push onto stack"
 			     "現在行をスタックへ移動(kill)") "
 \\[mpg123-yank-line]	" (m "Yank music line from stack"
 			     "スタックの一番上から曲を戻す(yank)") "
+\\[mpg123-introduction-quiz-mode]	"
+     (m "Intro-quiz mode ON/OFF (Stop at marked position)"
+	"イントロクイズモード ON/OFF (マークした位置で必ず止まる)") "
 \\[mpg123-quit]	" (m "Quit" "終了") "
 \\[mpg123-quit-yes]	" (m "Quit without query" "終了(確認なし)") "
 \\[mpg123-mouse-force-play]	" (m "Select a music directly on the mouse cursor"
@@ -2200,18 +2405,31 @@ the music will immediately move to that position."
     (setq buffer-read-only nil)
     (erase-buffer))
   (mpg123-mode)
-  (let (f (i 1) name)
+  (mpg123:add-musiclist-to-point files 1)
+  (mpg123:draw-slider-help t))
+
+(defun mpg123:add-musiclist-to-point (files i)
+  "Add music FILES to point and music-info-alist"
+  (let (f sf (i (1+ (length mpg123*music-alist))) name)
     (while files
       (setq f (car files))
+      (if (consp f)
+	  (setq sf (cdr f)
+		f (car f))
+	(setq sf nil))
       (setq name (if (fboundp mpg123-id3-tag-function)
 		     (funcall mpg123-id3-tag-function f)
 		   (file-name-nondirectory f)))
       (mpg123:set-music-info i 'filename f)
       (mpg123:set-music-info i 'name name)
-      (insert (mpg123:format-line i))
+      (if sf
+	  (progn
+	    (mpg123:set-music-info i 'marktime sf)
+	    (mpg123:set-music-info
+	     i 'mark (mpg123:time2frame sf f))))
+      (insert-before-markers (mpg123:format-line i))
       (setq i (1+ i)
-	    files (cdr files))))
-  (mpg123:draw-slider-help t))
+	    files (cdr files)))))
 
 (defun mpg123:draw-slider-help (&optional initial)
   "Draw slider and help message"
@@ -2269,23 +2487,13 @@ the music will immediately move to that position."
   (buffer-disable-undo)
   (save-excursion
     (goto-char (marker-position mpg123*end-of-list-marker))
-    (let (f (i (1+ (length mpg123*music-alist))) name)
-      (while files
-	(setq f (car files))
-	(setq name (if (fboundp mpg123-id3-tag-function)
-		       (funcall mpg123-id3-tag-function f)
-		     (file-name-nondirectory f)))
-	(mpg123:set-music-info i 'filename f)
-	(mpg123:set-music-info i 'name name)
-	(insert-before-markers (mpg123:format-line i))
-	(setq i (1+ i)
-	      files (cdr files))))
+    (mpg123:add-musiclist-to-point files (1+ (length mpg123*music-alist)))
     (setq buffer-read-only t)))
 
 (defun mpg123-save-playlist (file)
   "Save current music list into a file"
   (interactive "FSave Playlist to a file: ")
-  (let (list n)
+  (let (list n fn marktime (dd (expand-file-name default-directory)))
     (or (eq major-mode 'mpg123-mode)
 	(error "[Save playlist] is only available in *mpg123* buffer."))
     (if (file-exists-p file)
@@ -2298,13 +2506,20 @@ the music will immediately move to that position."
 	(goto-char (point-min))
 	(while (looking-at "^[ 0-9]+")
 	  (setq n (mpg123:get-music-number)) ;get current line's music No.
-	  (setq list (cons (mpg123:get-music-info n 'filename) list))
+	  (setq list (cons n list))
 	  (forward-line 1))
 	(set-buffer (find-file-noselect file))
 	(erase-buffer)
 	(while list
 	  (goto-char (point-min))
-	  (insert (abbreviate-file-name (car list)) "\n")
+	  (setq fn (mpg123:get-music-info (car list) 'filename)
+		marktime (mpg123:get-music-info (car list) 'marktime))
+	  (if (string-match (concat "^" (regexp-quote dd)) fn)
+	      (setq fn (substring fn (match-end 0))))
+	  (insert (concat
+		   (abbreviate-file-name fn)
+		   (if marktime (concat "///" marktime))
+		   "\n"))
 	  (setq list (cdr list)))
 	(basic-save-buffer)))))
 
