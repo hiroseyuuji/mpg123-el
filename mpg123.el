@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Sep 21 22:09:47 2002 on firestorm
-;;; Update count: 1010
+;;; Last modified Wed Sep 25 14:49:45 2002 on firestorm
+;;; Update count: 1012
 
 ;;[News]
 ;;	Support OggVorbis (thanks to Andreas Fuchs <asf@acm.org>)
@@ -289,10 +289,16 @@
 ;;		Support OggVorbis.
 ;;	Akinori MUSHA <knu@iDaemons.org>
 ;;		Sent a patch to read oggcomment correctly
+;;	Yoichi NAKAYAMA <yoichi@eken.phys.nagoya-u.ac.jp>
+;;		Fixed the bug when mpg123*use-face is nil.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.32  2002/09/25 05:50:21  yuuji
+;; Fixed the bug when mpg123*use-face is nil.
+;; Suggested by Yoichi NAKAYAMA <yoichi@eken.phys.nagoya-u.ac.jp>
+;;
 ;; Revision 1.31  2002/09/21 13:10:16  yuuji
 ;; Fixed documentation for mpg123:ogg123-peek-tag.
 ;;
@@ -1108,6 +1114,7 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	    (setq mpg123*cur-start-frame
 		  (mpg123:time2frame time music))))))
       (setq mpg123*time-setting-mode nil)
+      (fset 'mpg123:slider-check 'mpg123:null) ;defaults to null
       (if mpg123*use-face
 	  (let ((frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
 		(istart mpg123*end-of-list-marker))
@@ -1133,8 +1140,7 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 		  (overlay-put (setq mpg123*slider-overlay
 				     (make-overlay istart (1+ istart)))
 			       'face
-			       'mpg123-face-slider))
-	      (fset 'mpg123:slider-check 'mpg123:null))))
+			       'mpg123-face-slider)))))
       (setq mpg123:time-regexp (mpg123:time-regexp music)
 	    mpg123:init-frame-regexp (mpg123:init-frame-regexp music)
 	    mpg123:frame-regexp (mpg123:frame-regexp music)
