@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Sep 27 18:06:51 2002 on firestorm
-;;; Update count: 1043
+;;; Last modified Sun Oct 20 22:29:10 2002 on firestorm
+;;; Update count: 1051
 
 ;;[News]
 ;;	Multibyte music tag displayed wrong, fixed.
@@ -299,10 +299,19 @@
 ;;		Sent a patch to read oggcomment correctly
 ;;	Yoichi NAKAYAMA <yoichi@eken.phys.nagoya-u.ac.jp>
 ;;		Fixed the bug when mpg123*use-face is nil.
+;;		Fixed handling of mpg123*initial-buffer.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.34  2002/10/20 13:31:41  yuuji
+;; * (mpg123:playlist-p): Save and restore current buffer.
+;; * (mpg123-quit): Don't switch to killed buffer.
+;; * (mpg123:create-buffer): Set mpg123*initial-buffer.
+;; * Don't set mpg123*initial-buffer while loading mpg123.el.
+;;
+;; (by Yoichi NAKAYAMA)
+;;
 ;; Revision 1.33  2002/09/27 09:09:34  yuuji
 ;; Multibyte music tag displayed wrong, fixed.
 ;; Variable `mpg123-ogg123-id-coding-system controls coding system
@@ -1480,22 +1489,23 @@ percentage in the length of the song etc.
    (file-exists-p file)
    (not (file-directory-p file))
    ;(not (mpg123:sound-p file))
-   (let ((b (set-buffer (get-buffer-create " *mpg123pl*")))
-	 (PATH_MAX 1024)
-	 (dir (file-name-directory file)))
-     (erase-buffer)
-     (insert-file-contents file nil 0 PATH_MAX)
-     (goto-char (point-min))
-     (while (looking-at "\\s *#") (forward-line 1))
-     (skip-chars-forward "[ \t]")
-     (prog1
-	 (file-exists-p
-	  (expand-file-name
-	   (buffer-substring
-	    (point)
-	    (progn (end-of-line) (skip-chars-backward "[ \t]") (point)))
-	   dir))
-       (kill-buffer b)))))
+   (save-excursion
+     (let ((b (set-buffer (get-buffer-create " *mpg123pl*")))
+	   (PATH_MAX 1024)
+	   (dir (file-name-directory file)))
+       (erase-buffer)
+       (insert-file-contents file nil 0 PATH_MAX)
+       (goto-char (point-min))
+       (while (looking-at "\\s *#") (forward-line 1))
+       (skip-chars-forward "[ \t]")
+       (prog1
+	   (file-exists-p
+	    (expand-file-name
+	     (buffer-substring
+	      (point)
+	      (progn (end-of-line) (skip-chars-backward "[ \t]") (point)))
+	     dir))
+	 (kill-buffer b))))))
 
 (defun mpg123-add-new (file)
   "Add a new file or directory to the playist"
@@ -1754,7 +1764,8 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 	     (or yes (y-or-n-p "Kill current music?")))
 	(mpg123:sure-kill p)
       (setq buffers (delete mpg123*buffer buffers))
-      (switch-to-buffer (get-buffer-create mpg123*initial-buffer)))
+      (if (buffer-name mpg123*initial-buffer) ;buffer-live-p check(mule2 OK)
+	  (switch-to-buffer mpg123*initial-buffer)))
     (setq mpg123*interrupt-p 'quit)
     (mapcar '(lambda (b) (and (get-buffer b) (kill-buffer b))) buffers)))
 
@@ -2012,7 +2023,10 @@ the music will immediately move to that position.
 (defun mpg123:create-buffer (files)
   "Create play-buffer"
   (random t)				;for mpg123-shuffle
-  (switch-to-buffer (get-buffer-create mpg123*buffer))
+  (let ((buf (get-buffer-create mpg123*buffer))
+	(cb (current-buffer)))
+    (or (eq cb buf) (setq mpg123*initial-buffer cb))
+    (switch-to-buffer buf))
   (make-local-variable 'truncate-lines)
   (setq truncate-lines t)
   (setq mpg123*window-width (window-width))
@@ -2247,8 +2261,6 @@ the music will immediately move to that position.
       nil
     (mpg123:set-volume mpg123-startup-volume)
     (put  'mpg123:initialize 'done t)))
-
-(setq mpg123*initial-buffer (current-buffer))
 
 ;; 
 ;; mpg123-id3-edit contributed by N. SHIMIZU <CZA06074@nifty.com>
