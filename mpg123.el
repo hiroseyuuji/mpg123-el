@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Dec  8 09:48:10 2000 on buell
-;;; Update count: 807
+;;; Last modified Sat Dec 23 16:39:33 2000 on firestorm
+;;; Update count: 810
 
 ;;[Commentary]
 ;;	
@@ -239,6 +239,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.18  2000/12/23 07:41:23  yuuji
+;; Slider stays wrong position when music list added.  Fixed
+;;
 ;; Revision 1.17  2000/12/08 00:54:09  yuuji
 ;; Variable mpg123-face-playing specifies the color of cursor for playing music.
 ;; Variable mpg123-face-slider specifies the color of slider of playing position.
@@ -849,7 +852,11 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
       (setq mpg123*time-setting-mode nil)
       (if mpg123*use-face
 	  (let ((frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
-		(istart (overlay-start mpg123*indicator-overlay)))
+		(istart mpg123*end-of-list-marker))
+	    (if (overlayp mpg123*indicator-overlay)
+		(delete-overlay mpg123*indicator-overlay))
+	    (setq mpg123*indicator-overlay
+		  (make-overlay istart (+ (window-width) istart)))
 	    (overlay-put (setq mpg123*cur-overlay
 			       (make-overlay
 				(save-excursion (beginning-of-line) (point))
@@ -1573,19 +1580,14 @@ the music will immediately move to that position.
   (setq mpg123*end-of-list-marker (point-marker))
   (if (overlayp mpg123*indicator-overlay)
       (delete-overlay mpg123*indicator-overlay))
-  (setq mpg123*indicator-overlay
-	(make-overlay
-	 (point)
-	 (progn
-	   (if mpg123-need-slider
-	       (progn
-		 (insert "0%")	;2columns
-		 (insert-char ?- (/ (- (window-width) 9) 2))
-		 (insert "50%")	;3columns
-		 (insert-char ?- (- (window-width) (current-column) 5))
-		 (insert "100%"))	;4columns
-	     (insert-char ?- (1- (window-width))))
-	   (point))))
+  (if mpg123-need-slider
+      (progn
+	(insert "0%")	;2columns
+	(insert-char ?- (/ (- (window-width) 9) 2))
+	(insert "50%")	;3columns
+	(insert-char ?- (- (window-width) (current-column) 5))
+	(insert "100%"))	;4columns
+    (insert-char ?- (1- (window-width))))
   (insert "\nVolume: [")
   (if (markerp mpg123*volume-marker)
       (set-marker mpg123*volume-marker nil))
