@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sun Jun 25 23:38:00 2000 on firestorm
-;;; Update count: 597
+;;; Last modified Sun Aug  6 00:20:13 2000 on firestorm
+;;; Update count: 664
 
 ;;[Commentary]
 ;;	
@@ -174,9 +174,16 @@
 ;;		Reported running on Windows98
 ;;	MOROHOSHI Akihiko <moro@nii.ac.jp>
 ;;		Sent a patch on coding-system detection for XEmacs+emu.el
+;;	Alex Shinn <foof@debian.org>
+;;		Sent a patch to enable mp3 files in multiple directories.
+;;		Implemented `playlist'.
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.10  2000/08/05 15:37:50  yuuji
+;; Handle mp3 files in multiple directories.
+;; Playlist support.
+;;
 ;; Revision 1.9  2000/06/25 14:38:17  yuuji
 ;; Fix for XEmacs+emu.el
 ;;
@@ -258,6 +265,9 @@ If want to check by filename, set this variable to filename regexp.
 MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 正規表現を指定する.")
 
+(defvar mpg123*show-help t
+  "*Print help summary in mpg123 buffer")
+
 (defvar mpg123-mode-map nil)
 (setq mpg123-mode-map (make-keymap))
 (define-key mpg123-mode-map "p" 'mpg123-prev-line)
@@ -278,12 +288,14 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "F" 'mpg123-forward-10)
 (define-key mpg123-mode-map "B" 'mpg123-backward-10)
 (define-key mpg123-mode-map "o" 'mpg123-open-new)
+(define-key mpg123-mode-map "a" 'mpg123-add-new)
 (define-key mpg123-mode-map "i" 'mpg123-increase-repeat-count)
 (define-key mpg123-mode-map "d" 'mpg123-decrease-repeat-count)
 (define-key mpg123-mode-map "k" 'mpg123-kill-line)
 (define-key mpg123-mode-map "K" 'mpg123-kill-stack)
 (define-key mpg123-mode-map "y" 'mpg123-yank-line)
 (define-key mpg123-mode-map "s" 'mpg123-shuffle)
+(define-key mpg123-mode-map "S" 'mpg123-save-playlist)
 (define-key mpg123-mode-map "\C-d" 'mpg123-delete-file)
 (define-key mpg123-mode-map "E" 'id3-edit)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
@@ -316,6 +328,11 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*volume-marker nil)
 (defvar mpg123*time-setting-mode nil)
 (defvar mpg123*repeat-count-marker nil)
+;(defvar mpg123-playlist-regexp ".*\\.m3u"
+;  "*Regular expression to match to playlist files")
+(defvar mpg123-url-regexp "http://.*"
+  "*Regular expression to match to URL requests")
+
 
 (defun mpg123:mp3-skip-id3v2 ()
   "Skip ID3v2 tag in current buffer."
@@ -333,32 +350,40 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 
 (defun mpg123:mp3-p (f)
   "Check the file F is MPEG 1 Audio file or not."
-  (and (> (nth 7 (file-attributes (file-truename f))) 128) ;check file size > 128
-       (let ((b (set-buffer (get-buffer-create " *mpg123tmp*")))
-	     (file-coding-system-alist (list (cons "." 'no-conversion))) ;20
-	     (file-coding-system
-	      (if (and (boundp '*noconv*) (coding-system-p '*noconv*))
-		  '*noconv* ;mule19
-		'no-conversion))		;XEmacs(maybe)
-	     (ofs (if (and (string-match "19.28" emacs-version)
-			   (featurep 'mule))
-		      -1 1))
-	     (file-coding-system-for-read '*noconv*)) ;19
-	 (set-buffer b)
-	 (erase-buffer)
-	 (insert "..")			;dummy dot to simplify the while loop
-	 (insert-file-contents f nil 0 mpg123-mp3-scan-bytes)
-	 (goto-char (point-min))
-	 (prog1 ; if short & 0xfff0 = 0xfff0, it is MPEG audio
-	     (or
-	      (looking-at "\\.\\.ID3")
-	      (catch 'found
-		(while (> (skip-chars-forward "^\xff") 0) ;Scan `0xff'
-		  (if (and (char-after (+ ofs (point)))
-			   (= (logand (char-after (+ ofs (point))) ?\xF0)
-			      ?\xF0))
-		      (throw 'found t)))))
-	   (kill-buffer b)))))
+  (save-excursion
+    ;;check file size > 128
+    (and (> (nth 7 (file-attributes (file-truename f))) 128)
+	 (let ((b (set-buffer (get-buffer-create " *mpg123tmp*"))) e0 b0
+	       (file-coding-system-alist (list (cons "." 'no-conversion))) ;20
+	       (file-coding-system
+		(if (and (boundp '*noconv*) (coding-system-p '*noconv*))
+		    '*noconv*		;mule19
+		  'no-conversion))	;XEmacs(maybe)
+	       (file-coding-system-for-read '*noconv*)) ;19
+	   (set-buffer b)
+	   (erase-buffer)
+	   (insert "..")		;dummy dot to simplify the while loop
+	   (insert-file-contents f nil 0 mpg123-mp3-scan-bytes)
+	   (goto-char (point-min))
+	   (prog1	; if short & 0xfff0 = 0xfff0, it is MPEG audio
+	       (or
+		(looking-at "\\.\\.ID3")
+		(catch 'found
+		  (if (string-match "^19\\." emacs-version)
+		      (while (search-forward "\xff" nil t) ;Scan `0xff'
+			(setq e0 (match-end 0) b0 (match-beginning 0))
+			(if (and (char-after b0)
+				 (= (logand
+				     (char-after (+ 1 b0)) ?\xF0)
+				    ?\xF0))
+			    (throw 'found t))
+			(goto-char e0))
+		    (while (> (skip-chars-forward "^\xff") 0) ;Scan `0xff'
+		      (if (and (char-after (1+ (point)))
+			       (= (logand (char-after (1+ (point)))
+					  ?\xF0) ?\xF0))
+			  (throw 'found t))))))
+	     (kill-buffer b))))))
 
 (defun mpg123:sound-p (f)
   (or (and mpg123-lazy-check (stringp mpg123-lazy-check)
@@ -850,14 +875,52 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (mpg123-forward (* -10 arg)))
 
 (defun mpg123-open-new (dir)
-  "Open new directory."
-  (interactive "Dmpg123 on directory: ")
-  (if (not (file-directory-p dir))
-      (error "Not directory: %s" dir))
+  "Open new directory or playlist."
+  (interactive "Fmpg123 on directory or playlist: ")
+  (if (not (file-exists-p dir))
+      (error "Not such file or directory: %s" dir))
   (let ((p (get-buffer-process (current-buffer))))
     (setq mpg123*interrupt-p t)
     (if (and p (process-status p)) (mpg123:sure-kill p))
     (mpg123 dir)))
+
+(defun mpg123:playlist-p (file)
+  "Check if FILE can be seemed to be a playlist"
+  (and
+   (file-exists-p file)
+   (not (file-directory-p file))
+   ;(not (mpg123:sound-p file))
+   (let ((b (set-buffer (get-buffer-create " *mpg123pl*"))))
+     (erase-buffer)
+     (insert-file-contents file nil 0 1024)
+     (goto-char (point-min))
+     (while (looking-at "\\s *#") (forward-line 1))
+     (skip-chars-forward "[ \t]")
+     (prog1
+	 (file-exists-p
+	  (buffer-substring
+	   (point)
+	   (progn (end-of-line) (skip-chars-backward "[ \t]") (point))))
+       (kill-buffer b)))))
+
+(defun mpg123-add-new (file)
+  "Add a new file or directory to the playist"
+  (interactive "Fmpg123 add to playlist: ")
+  ;;(cd (file-name-directory file))
+  (setq file (expand-file-name file))
+  (cond ((file-directory-p file)
+         ;; Add all files and playlists in a directory
+         (mpg123-add-to-playlist (mpg123:mp3-files-in-dir file)))
+        (;(string-match mpg123-playlist-regexp file)
+	 (mpg123:playlist-p file)
+         ;; Add all files in a playlist file
+         (mpg123-add-to-playlist (mpg123:mp3-files-in-list file)))
+        ((string-match mpg123-url-regexp file)
+         ;; Add file[s] from an external URL
+         (error "mpg123: URL's not yet supported"))
+        (t
+         ;; Add a single file
+         (mpg123-add-to-playlist (list file)))))
 
 (defun mpg123-increase-repeat-count (arg)
   "Increase repeat count."
@@ -1073,7 +1136,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (mapcar '(lambda (b) (and (get-buffer b) (kill-buffer b))) buffers)))
 
 (defun mpg123:mp3-files-in-dir (dir)
-  "Return mp3 files"
+  "Return mp3 files in a directory"
   (let ((files (sort (directory-files dir) 'string<)) f mp3s)
     (while files
       (message "Inspect file %s..." (car files))
@@ -1084,6 +1147,44 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
       (setq files (cdr files)))
     (message "")
     (nreverse mp3s)))
+
+(defun mpg123:mp3-files-in-list1 (file)
+  (save-excursion
+    (let ((buf (find-file-noselect file))
+          (dir (file-name-directory file)) f mp3s)
+      (put 'mpg123:mp3-files-in-list 'parsed
+	   (cons (cons (expand-file-name file) nil)
+		 (get 'mpg123:mp3-files-in-list 'parsed)))
+      (set-buffer buf)
+      (goto-char (point-min))
+      (while (not (eobp))
+        (and (looking-at "^[ \t]*\\(.*[^ \t\n]\\)[ \t\n]*$")
+             (setq f (expand-file-name
+                      (buffer-substring (match-beginning 1)
+                                        (match-end 1))
+                      dir))
+             (message "Inspect file %s..." f)
+             (not (file-directory-p f))
+             (file-readable-p f)
+	     (cond
+	      ((mpg123:sound-p f)
+	       (setq mp3s (cons f mp3s)))
+	      ((and
+		(not (assoc (expand-file-name f)
+			    (get 'mpg123:mp3-files-in-list 'parsed)))
+		(mpg123:playlist-p f))
+	       (setq mp3s (append (mpg123:mp3-files-in-list1 f) mp3s)))))
+        (message "")
+        (forward-line 1))
+      (if (buffer-modified-p buf)
+          (bury-buffer buf)
+        (kill-buffer buf))
+      mp3s)))
+
+(defun mpg123:mp3-files-in-list (file)
+  "Return mp3 files in a playlist"
+  (put 'mpg123:mp3-files-in-list 'parsed nil)
+  (nreverse (mpg123:mp3-files-in-list1 file)))
 
 (defun mpg123:squeeze-spaces-buffer ()
   (save-excursion
@@ -1133,7 +1234,8 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 
 (defun mpg123:insert-help ()
   "Insert help string to current buffer."
-  (insert (substitute-command-keys "
+  (if mpg123*show-help
+      (insert (substitute-command-keys "
 mpg123:
 \\[mpg123-play-stop]	Play or pause
 \\[mpg123-play]	Play
@@ -1150,7 +1252,9 @@ mpg123:
 \\[mpg123-prev-line]	Move to previous line
 \\[mpg123-volume-increase]	Volume up
 \\[mpg123-volume-decrease]	Volume down
-\\[mpg123-open-new]	Open other directory
+\\[mpg123-open-new]	Open other directory or playlist file
+\\[mpg123-add-new]	Add other directory or playlist file
+\\[mpg123-save-playlist]	Save current playlist to a file
 \\[mpg123-increase-repeat-count]	Increase repetition count
 \\[mpg123-decrease-repeat-count]\tDecrease repetition count (-1 for infinity)
 \\[mpg123-shuffle]	Shuffle music list
@@ -1158,7 +1262,8 @@ mpg123:
 \\[mpg123-yank-line]	Yank music line from stack
 \\[mpg123-quit]	Quit
 "
-)))
+))))
+
 
 (defun mpg123:format-line (n)
   (if (stringp n) (setq n (string-to-int n)))
@@ -1225,11 +1330,57 @@ mpg123:
   (goto-char (point-min))
   )
 
+(defun mpg123-add-to-playlist (files)
+  "Add files to the current playlist"
+  (switch-to-buffer (get-buffer-create mpg123*buffer))
+  (setq buffer-read-only nil)
+  (buffer-disable-undo)
+  (save-excursion
+    (goto-char (marker-position mpg123*end-of-list-marker))
+    (let (f (i (1+ (length mpg123*music-alist))) name)
+      (while files
+	(setq f (car files))
+	(setq name (if (fboundp mpg123-id3-tag-function)
+		       (funcall mpg123-id3-tag-function f)
+		     (file-name-nondirectory f)))
+	(mpg123:set-music-info i 'filename f)
+	(mpg123:set-music-info i 'name name)
+	(insert-before-markers (mpg123:format-line i))
+	(setq i (1+ i)
+	      files (cdr files))))
+    (setq buffer-read-only t)))
+
+(defun mpg123-save-playlist (file)
+  "Save current music list into a file"
+  (interactive "FSave Playlist to a file: ")
+  (let (list n)
+    (or (eq major-mode 'mpg123-mode)
+	(error "[Save playlist] is only available in *mpg123* buffer."))
+    (if (file-exists-p file)
+	(or (y-or-n-p (format "Overwrite %s? " file))
+	    (error "Abort.")))
+    (save-excursion
+      (save-restriction
+	(widen)
+	(narrow-to-region (point-min) mpg123*end-of-list-marker)
+	(goto-char (point-min))
+	(while (looking-at "^[ 0-9]+")
+	  (setq n (mpg123:get-music-number)) ;get current line's music No.
+	  (setq list (cons (mpg123:get-music-info n 'filename) list))
+	  (forward-line 1))
+	(set-buffer (find-file-noselect file))
+	(erase-buffer)
+	(while list
+	  (goto-char (point-min))
+	  (insert (abbreviate-file-name (car list)) "\n")
+	  (setq list (cdr list)))
+	(basic-save-buffer)))))
+
 ;;;
 ;; Mixer
 ;;;
 (defun mpg123:get-volume ()
-  "Get current volume."
+  "Get current volume"
   (if mpg123-mixer-command
       (cond
        ((eq mpg123-system-type 'freebsd)
@@ -1313,12 +1464,22 @@ mpg123:
 ;;;
 ;; mpg123 main function
 ;;;
-(defun mpg123 (dir)
-  "Call mpg123 on dir"
-  (interactive "Dmpg123 on dir: ")
-  (if (not (file-directory-p dir))
-      (error "It's not directory! %s" dir))
-  (let ((files (mpg123:mp3-files-in-dir dir)))
+(defun mpg123 (file)
+  "Call mpg123 on file"
+  (interactive "Fmpg123 on file: ")
+  (let ((dir (file-name-directory file))
+        (files
+         (cond ((file-directory-p file)
+                ;; Add all files and playlists in a directory
+                (mpg123:mp3-files-in-dir file))
+               ((mpg123:playlist-p file)
+                ;; Load all files in a playlist file
+		(mpg123:mp3-files-in-list file))
+               ((mpg123:sound-p file)
+                ;; Add a single file
+                (list file))
+               (t
+                (error "Not an mp3 or playlist: %s" file)))))
     (mpg123:create-buffer files)
     (message "Let's listen to the music. Type SPC to start.")
     (run-hooks 'mpg123-hook)))
