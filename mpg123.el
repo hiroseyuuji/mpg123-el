@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Wed Feb  9 13:12:21 2000 on hornet
-;;; Update count: 536
+;;; Last modified Sun Jun 25 23:38:00 2000 on firestorm
+;;; Update count: 597
 
 ;;[Commentary]
 ;;	
@@ -139,7 +139,7 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(1999/6現在)。
+;;	下のアドレスまでお願いします(2000/5現在)。
 ;;							yuuji@gentei.org
 ;;[Acknowledgement]
 ;;	
@@ -151,9 +151,35 @@
 ;;		100.
 ;;	Kenichi OKADA, <okada@opaopa.org>
 ;;		Sent a patch of setting sound volume on Solaris/sparc.
+;;	Takuro Horikawa <takuroho@tky3.3web.ne.jp>
+;;		Reported running on WinNT.
+;;		Port mixer to Windows.
+;;		(See http://www3.tky.3web.ne.jp/~takuroho/mpg123.html)
+;;	TAOKA Satoshi <taoka@infonets.hiroshima-u.ac.jp>
+;;		Put mpg123.el into FreeBSD ports collection
+;;	T. V. Raman <ramantv@earthlink.net>
+;;		Made emacspeak-mpg123.el.  Many comments.
+;;	Per Weijnitz <Per.Weijnitz@etl.ericsson.se>
+;;		Sent a patch to enable mixer command on NT4
+;;	Takayuki TSUKAGOSHI <tsuka@soft.ics.keio.ac.jp>
+;;		Sent a patch for mule2@19.34.
+;;	Ryuichi Arafune <arafune@debian.org>
+;;		Put mpg123.el to Debian package.
+;;	Laurent Martelli <martelli@iie.cnam.fr>
+;;		Sent a patch of passing optional arguments to mpg123.
+;;		Volume control for Linux.
+;;	T. Amano <tomoo@cheri.sh>
+;;		Reported running on Linux.
+;;	OHTAKI Naoto <ohtaki@wig.nu>
+;;		Reported running on Windows98
+;;	MOROHOSHI Akihiko <moro@nii.ac.jp>
+;;		Sent a patch on coding-system detection for XEmacs+emu.el
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.9  2000/06/25 14:38:17  yuuji
+;; Fix for XEmacs+emu.el
+;;
 ;; Revision 1.8  2000/02/09 04:15:31  yuuji
 ;; Fix for mule2 (mpg123:sound-p).
 ;;
@@ -176,15 +202,18 @@
 (defvar mpg123-system-type
   (cond
    ((string-match "freebsd" (emacs-version))	'freebsd)
-   ((string-match "netbsd" (emacs-version))	'netbsd)  ;not yet
-   ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet
-   ((string-match "linux" (emacs-version))	'linux)   ;not yet maybe
-   ((string-match "nt4" (emacs-version))	'nt)
+   ((string-match "netbsd" (emacs-version))	'netbsd)  ;not yet tested
+   ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet tested
+   ((string-match "linux" (emacs-version))	'linux)
+   ((string-match "nt4\\|windows9" (emacs-version)) 'nt)
    ((string-match "solaris" (emacs-version))	'solaris)))
 
 (defvar mpg123-command "mpg123"
   "*Command name of mpg123 player. Need 0.59q or later.
 mpg123のコマンド名。0.59qが必要。")
+(defvar mpg123-command-args nil
+  ;;'("--8bit -m")	;<- example
+  "*Arguments to give to mpg123")
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
 	     '((freebsd . "mixer") (linux . "aumix")
@@ -219,9 +248,15 @@ mpg123コマンド用の漢字コード。漢字ファイル名があるときは必須")
 (defvar mpg123-omit-id3-artist nil
   "*Non-nil for omitting artist name display of ID3 tag.
 non-nilのときID3タグからのアーチスト名表示を省略する。")
-(defvar mpg123-mp3-scan-bytes 2
+(defvar mpg123-mp3-scan-bytes 3
   "*Default number of bytes of header to examine the file is mp3 or not.
 MP3ファイルかどうかを調べるために読み込むファイルの先頭のバイト数")
+
+(defvar mpg123-lazy-check nil
+  "*Check sound file or not by filename.
+If want to check by filename, set this variable to filename regexp.
+MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
+正規表現を指定する.")
 
 (defvar mpg123-mode-map nil)
 (setq mpg123-mode-map (make-keymap))
@@ -282,12 +317,29 @@ MP3ファイルかどうかを調べるために読み込むファイルの先頭のバイト数")
 (defvar mpg123*time-setting-mode nil)
 (defvar mpg123*repeat-count-marker nil)
 
-(defun mpg123:sound-p (f)
+(defun mpg123:mp3-skip-id3v2 ()
+  "Skip ID3v2 tag in current buffer."
+  (let ((case-fold-search nil) (p (point)))
+    (while (looking-at "ID3")
+      (goto-char (setq p (+ p 6)))	;header size location
+      (goto-char
+       (+ p
+	  (* 128 128 128 (char-after p))
+	  (* 128 128 (char-after (1+ p)))
+	  (* 128 (char-after (+ p 2)))
+	  (char-after (+ p 3))
+	  4)))
+    (goto-char (1- (point)))))
+
+(defun mpg123:mp3-p (f)
   "Check the file F is MPEG 1 Audio file or not."
   (and (> (nth 7 (file-attributes (file-truename f))) 128) ;check file size > 128
        (let ((b (set-buffer (get-buffer-create " *mpg123tmp*")))
 	     (file-coding-system-alist (list (cons "." 'no-conversion))) ;20
-	     (file-coding-system '*noconv*)
+	     (file-coding-system
+	      (if (and (boundp '*noconv*) (coding-system-p '*noconv*))
+		  '*noconv* ;mule19
+		'no-conversion))		;XEmacs(maybe)
 	     (ofs (if (and (string-match "19.28" emacs-version)
 			   (featurep 'mule))
 		      -1 1))
@@ -298,12 +350,20 @@ MP3ファイルかどうかを調べるために読み込むファイルの先頭のバイト数")
 	 (insert-file-contents f nil 0 mpg123-mp3-scan-bytes)
 	 (goto-char (point-min))
 	 (prog1 ; if short & 0xfff0 = 0xfff0, it is MPEG audio
-	     (catch 'found
-	       (while (> (skip-chars-forward "^\xff") 0) ;Scan `0xff'
-		 (if (and (char-after (+ ofs (point)))
-			  (= (logand (char-after (+ ofs (point))) ?\xF0) ?\xF0))
-		     (throw 'found t))))
+	     (or
+	      (looking-at "\\.\\.ID3")
+	      (catch 'found
+		(while (> (skip-chars-forward "^\xff") 0) ;Scan `0xff'
+		  (if (and (char-after (+ ofs (point)))
+			   (= (logand (char-after (+ ofs (point))) ?\xF0)
+			      ?\xF0))
+		      (throw 'found t)))))
 	   (kill-buffer b)))))
+
+(defun mpg123:sound-p (f)
+  (or (and mpg123-lazy-check (stringp mpg123-lazy-check)
+	   (string-match mpg123-lazy-check (file-name-nondirectory f)))
+      (mpg123:mp3-p f)))
 
 (defun mpg123-next-line (arg)
   "Down line"
@@ -539,6 +599,20 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (and (equal mpg123*buffer (buffer-name))
        (< (point) mpg123*end-of-list-marker)))
 
+;;2000/5/19
+(defvar mpg123*use-face nil)
+(defvar mpg123*cur-overlay nil
+  "Overlay to indicate playing positino")
+(if (and (fboundp 'make-face) mpg123*use-face)
+    (progn
+      (make-face 'mpg123*cur-face)
+      (if (and window-system (x-display-color-p))
+	  (progn
+	    (set-face-background 'mpg123*cur-face "#008080")
+	    (set-face-foreground 'mpg123*cur-face "yellow"))
+	(set-face-underline-p 'mpg123*cur-face t)))
+  (setq mpg123*use-face nil))
+
 (defun mpg123:play (&optional startframe)
   "Play mp3 on current line."
   (save-excursion
@@ -549,6 +623,9 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (if (and mpg123*cur-play-marker
 	   (markerp mpg123*cur-play-marker))
       (set-marker mpg123*cur-play-marker nil))
+  (and mpg123*use-face
+       mpg123*cur-overlay
+       (delete-overlay mpg123*cur-overlay))
   (setq mpg123*cur-play-marker (point-marker))
   (skip-chars-forward " ")
   (if (or (not (looking-at "[0-9]"))
@@ -576,14 +653,24 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	  (setq music (code-convert-string
 		       music mpg123-process-coding-system *internal*)))
       (setq mpg123*time-setting-mode nil)
+      (if mpg123*use-face
+	  (overlay-put (setq mpg123*cur-overlay
+			     (make-overlay
+			      (save-excursion (beginning-of-line) (point))
+			      (save-excursion (end-of-line) (point))))
+		       'face
+		       'mpg123*cur-face))
       (set-process-filter
-       (setq p (start-process "mpg123"
-			      (current-buffer)
-			      mpg123-command
-			      "-v"
-			      "-k" mpg123*cur-start-frame
-			      music
-			      ))
+       (setq p (apply 'start-process "mpg123"
+		      (current-buffer)
+		      mpg123-command
+		      (delq nil
+			    (append
+			     (list
+			      "-v" "-k" mpg123*cur-start-frame)
+			     mpg123-command-args
+			     (list music)
+			     ))))
        (if (mpg123:get-music-info mpg123*cur-music-number 'length)
 	   'mpg123:filter
 	 'mpg123:initial-filter))
@@ -1161,7 +1248,20 @@ mpg123:
 	    (setq vol "unknown"))
 	  (setq mpg123*cur-volume vol)))
        ((eq mpg123-system-type 'linux)
-	"unknown")
+	(let ((b (get-buffer-create " *mpg123 mixer* "))
+	      vol)
+	  (set-buffer b)
+	  (erase-buffer)
+	  (call-process mpg123-mixer-command nil b nil "-v" "q")
+	  (goto-char (point-min))
+	  (if (re-search-forward "vol *\\([0-9]+\\), *\\([0-9]+\\)" nil t)
+	      (let ((left (buffer-substring
+			   (match-beginning 1) (match-end 1)))
+		    (right (buffer-substring
+			    (match-beginning 2) (match-end 2))))
+		(setq vol (cons (string-to-int left) (string-to-int right))))
+	    (setq vol "unknown"))
+	  (setq mpg123*cur-volume vol)))
        ((eq mpg123-system-type 'solaris)
 	"unknown"))))
 
