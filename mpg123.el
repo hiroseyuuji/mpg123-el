@@ -2,10 +2,11 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2003 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Mar 28 23:43:09 2003 on firestorm
-;;; Update count: 1094
+;;; Last modified Mon Mar 31 11:31:09 2003 on firestorm
+;;; Update count: 1102
 
 ;;[News]
+;;	CR-LF(DOS) encoding playlist treated correctly(thanks to lenbok).
 ;;	Audio(mp3/ogg) file detection refined for XEmacs.
 ;;	Japanese messages.
 ;;	New key binding `g' - goto current music line.
@@ -299,10 +300,15 @@
 ;;	Yoichi NAKAYAMA <yoichi@eken.phys.nagoya-u.ac.jp>
 ;;		Fixed the bug when mpg123*use-face is nil.
 ;;		Fixed handling of mpg123*initial-buffer.
+;;	Len Trigg <lenbok@myrealbox.com>
+;;		Sent a patch and report on playlist file parsing.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.37  2003/03/31 02:31:33  yuuji
+;; CR-LF(DOS) encoding playlist treated correctly. (by lenbok)
+;;
 ;; Revision 1.36  2003/03/28 16:00:58  yuuji
 ;; For XEmacs: 'no-conversion changed to 'binary.
 ;; `g' mpg123-goto-current-line.
@@ -1527,7 +1533,7 @@ percentage in the length of the song etc.
 	   (let ((name(buffer-substring
 		       (point)
 		       (progn (end-of-line)
-			      (skip-chars-backward "[ \t]") (point)))))
+			      (skip-chars-backward "[ \t\r]") (point)))))
 	     (and
 	      (file-exists-p (expand-file-name name dir))
 	      (mpg123:get-sound-type name)))
@@ -1827,7 +1833,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
       (set-buffer buf)
       (goto-char (point-min))
       (while (not (eobp))
-        (and (looking-at "^[ \t]*\\(.*[^ \t\n]\\)[ \t\n]*$")
+        (and (looking-at "^[ \t]*\\(.*[^ \t\n\r]\\)[ \t\n\r]*$")
              (setq f (expand-file-name
                       (buffer-substring (match-beginning 1)
                                         (match-end 1))
