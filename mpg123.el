@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Feb 15 13:33:59 2002 on balius
-;;; Update count: 862
+;;; Last modified Mon Apr  8 12:50:01 2002 on firestorm
+;;; Update count: 864
 
 ;;[News]
 ;;	Key binding to Delete-file is changed from `C-d' to `D'.
@@ -245,10 +245,15 @@
 ;;		Many suggestions.
 ;;	N. SHIMIZU <CZA06074@nifty.com>
 ;;		Sent a patch to restore cursor position after id3-edit.
+;;	HIROSE Yoshihide <yoshihide@fast.co.jp>
+;;		Report and sent a patch for IRIX6.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.26  2002/04/08 03:57:25  yuuji
+;; IRIX 6.3 OK
+;;
 ;; Revision 1.25  2002/02/15 04:37:32  yuuji
 ;; mpg123-refresh-tag, mpg123-id3-edit by N. SHIMIZU <CZA06074@nifty.com>
 ;;
@@ -335,6 +340,7 @@
    ((string-match "netbsd" (emacs-version))	'netbsd)
    ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet tested
    ((string-match "linux" (emacs-version))	'linux)
+   ((string-match "irix" (emacs-version))	'irix)
    ((string-match "nt4\\|windows9" (emacs-version)) 'nt)
    ((string-match "solaris" (emacs-version))	'solaris)))
 
@@ -347,7 +353,7 @@ mpg123のコマンド名。0.59qが必要。")
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
 	     '((freebsd . "mixer") (netbsd . "mixerctl") (openbsd . "mixerctl")
-	       (linux . "aumix")
+	       (linux . "aumix") (irix . "apanel -nodisplay")
 	       (solaris . "audioctl") (nt . "mixer.exe"))))
   "*Command name for mixer setting utility
 mixer調節用コマンド")
@@ -355,7 +361,7 @@ mixer調節用コマンド")
   (cdr (assq mpg123-system-type
 	     '((freebsd . ("vol" "pcm")) (netbsd . ("outputs.master"))
 	       (openbsd . ("outputs.master"))
-	       (linux . ("-w"))
+	       (linux . ("-w")) (irix . ("-outlevels"))
 	       (solaris . ("-v")) (nt . ("-v")))))
   "*Option list for volume setting utility.
 mixer調節コマンドの音量調節オプションのリスト")
