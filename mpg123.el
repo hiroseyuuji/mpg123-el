@@ -1,9 +1,9 @@
 ;;; -*- Emacs-Lisp -*-
-;;; A front-end program for mpg123
+;;; A front-end program to mpg123
 ;;; (c)1999 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Thu Jun 24 17:01:49 1999 on vfr
-;;; Update count: 320
+;;; Last modified Fri Jun 25 17:56:29 1999 on firestorm
+;;; Update count: 352
 
 ;;[Commentary]
 ;;	
@@ -109,8 +109,14 @@
 ;;	
 ;;[Bugs]
 ;;	
-;;	It is impossible to yank music line onto the end of list.
-;;	曲リストの最後尾にスタックからの曲をyankできません。
+;;	It is perhaps only on my system, sometimes mpg123 command gets
+;;	confused to decode and ticks time playing time very slowly.  In
+;;	such case, mpg123 cannot detect that condition.  If you come to
+;;	see such behavior, please pause and restart player.
+;;	
+;;	たまにmpg123が動いてはいるものの音を出さなくなってしまうことがあ
+;;	ります。そのような挙動をmpg123.elは検出できないので、そうなった
+;;	らSPCで一旦止めて動かし直してください。
 ;;	
 ;;[No Warranty]
 ;;	
@@ -217,7 +223,6 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	 (set-buffer b)
 	 (erase-buffer)
 	 (insert-file-contents f nil 0 2) ;insert 2bytes of the beginning
-	 (goto-char (point-min))
 	 (prog1 ; if short & 0xfff0 = 0xfff0, it is MPEG audio
 	     (and (= (char-after 1) ?\xFF)
 		  (= (logand (char-after 2) ?\xF0) ?\xF0))
@@ -257,7 +262,9 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	(list 'let (list 'buffer-read-only)
 	      (list 'mpg123:goto-playtime-position)
 	      (list 'delete-char 5)
-	      (list 'insert timestr))))
+	      (list 'insert timestr)
+	      ;(list 'set-buffer-modified-p nil) ;is not essential
+	      )))
 
 (defun mpg123:update-length (timestr)
   "Update music length time string"
@@ -314,27 +321,64 @@ mpg123.el初回起動時の音量のデフォルト値.")
 (defmacro mpg123:get-music-info (n attr)
   (list 'cdr (list 'assq attr (list 'assoc n 'mpg123*music-alist))))
 
+(defun mpg123:open-error ()
+  (momentary-string-display "
+***********************************************************
+Something is wrong with sound device.
+It is seemed that you don't have set up sound device on
+this machine, or you already have running some application
+which lock sound device in othersession to this host.
+Anyway, you have to make sure that mpg123 program plays
+mp3 files on your pseudo terminal(xterm, rxvt, etc).
+-- Type SPC to exit ---
+
+サウンドデバイスが開けん素。
+このマシンのオーディオデバイスはちゃんと設定したけ?
+あと、ほかにサウンドデバイスを使うアプリケーションを起動して
+いるんちゃう?
+まず、ktermなどで mpg123 コマンド単独で音楽再生できるかどうか
+確認してみれ。
+(スペースキーでオサラバ)
+***********************************************************" (point)))
+  
+
+(defun mpg123:initial-filter (proc mess)
+  "mpg123 process filter No.1, called at startup of mpg123."
+  (if (string-match "Can't open /dev" mess)
+      (progn
+	(set-process-filter proc nil)
+	(mpg123:open-error)
+	(error "bye")))
+  (if (string-match "Frame# *[0-9]+ *\\[\\([0-9]+\\]\\)" mess)
+      (let ((f (substring mess (match-beginning 1) (match-end 1))))
+	(mpg123:set-music-info
+	 mpg123*cur-music-number 'frames (string-to-number f))))
+  (if (string-match "Frame# *[0-9]+ *\\[\\([0-9]+\\]\\)" mess)
+      (let ((f (substring mess (match-beginning 1) (match-end 1))))
+	(mpg123:set-music-info
+	 mpg123*cur-music-number 'frames (string-to-number f))))
+  (if (string-match "Time: \\(..:..\\)... +\\[\\(..:..\\)" mess)
+      (let ((cur (substring mess (match-beginning 1) (match-end 1)))
+	    (max (substring mess (match-beginning 2) (match-end 2))))
+	(mpg123:update-playtime cur)
+	(mpg123:set-music-info
+	 mpg123*cur-music-number 'length max)
+	(if (not (string-equal "00:00" max))
+	    (mpg123:update-length max))
+    ))
+  (and (mpg123:get-music-info mpg123*cur-music-number 'length)
+       (set-process-filter proc 'mpg123:filter)))
 
 (defun mpg123:filter (proc mess)
   (if (stringp mess)
       (save-excursion
 	;;(set-buffer mpg123*info-buffer)  ;heavy
 	;;(insert mess)                    ;jobs
-	(if (string-match "Time: \\(..:..\\)... +\\[\\(..:..\\)" mess)
-	    (let ((s (substring mess (match-beginning 1) (match-end 1)))
-		  l)
+	(if (string-match "Time: \\(..:..\\)" mess)
+	    (let ((s (substring mess (match-beginning 1) (match-end 1))))
 	      (and (not (string= s mpg123*cur-playtime))
 		   (not mpg123*time-setting-mode)
-		   (mpg123:update-playtime (setq mpg123*cur-playtime s)))
-	      (or (mpg123:get-music-info mpg123*cur-music-number 'length)
-		  (progn
-		    (mpg123:set-music-info
-		     mpg123*cur-music-number
-		     'length
-		     (setq
-		      l (substring mess (match-beginning 2) (match-end 2))))
-		    (mpg123:update-length l))
-		  )))
+		   (mpg123:update-playtime (setq mpg123*cur-playtime s)))))
 	(if (string-match "Frame# +\\([0-9]+\\)" mess)
 	    (setq mpg123*cur-playframe
 		  (substring mess  (match-beginning 1) (match-end 1))))
@@ -356,7 +400,7 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	    (goto-char mpg123*cur-play-marker)
 	    (mpg123-next-line 1)
 	    (if (and (not (mpg123:in-music-list-p))
-		     (mpg123:repeat-check))
+		     (mpg123:repeat-check)) ;decrement counter and check
 		(goto-char (point-min)))
 	    (mpg123:play)))))))
 
@@ -367,8 +411,17 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	    (substring timestr (match-beginning 1) (match-end 1))))
 	(s (string-to-number
 	    (substring timestr (match-beginning 2) (match-end 2))))
-	(total (+ (* m 60) s)))
-    (format "%d" (/ (* total 1000) 26))))
+	(total (+ (* m 60) s))
+	(frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
+	(length (mpg123:get-music-info mpg123*cur-music-number 'length))
+	(ratio-f 1000) (ratio-s 26))
+    (if (and frames length)
+	;;if total frames and length(in time) is available,
+	;;use them to calculate target frame number
+	(setq ratio-f frames
+	      ratio-s (+ (* 60 (string-to-number (substring length 0 2)))
+			 (string-to-number (substring length 3 5)))))
+    (format "%d" (/ (* total ratio-f) ratio-s))))
 
 (defun mpg123:in-music-list-p ()
   (and (equal mpg123*buffer (buffer-name))
@@ -419,7 +472,9 @@ mpg123.el初回起動時の音量のデフォルト値.")
 			      "-k" mpg123*cur-start-frame
 			      music
 			      ))
-       'mpg123:filter)
+       (if (mpg123:get-music-info mpg123*cur-music-number 'length)
+	   'mpg123:filter
+	 'mpg123:initial-filter))
       (message "%s %s.."
 	       mpg123*cur-music-number
 	       (mpg123:get-music-info mpg123*cur-music-number 'name))
@@ -641,7 +696,8 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	  (use-local-map mpg123-mode-map))
 	(while (and (> arg 0) (mpg123:in-music-list-p))
 	  (setq n (mpg123:get-music-number))
-	  (if (and (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
+	  (if (and (markerp mpg123*cur-play-marker)
+		   (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
 		   (= (point) mpg123*cur-play-marker))
 	      (setq current t))
 	  (delete-region (point)
@@ -665,6 +721,10 @@ mpg123.el初回起動時の音量のデフォルト値.")
   "Yank music line from stack buffer."
   (interactive "p")
   (beginning-of-line)
+  (if (= mpg123*end-of-list-marker (point))
+      (let (buffer-read-only)
+	(insert-before-markers "\t") ;dirty hack!
+	(backward-char 1)))
   (if (mpg123:in-music-list-p)
       (let ((sb (get-buffer-create mpg123*stack-buffer))
 	    (sw (selected-window)) stackw
@@ -675,7 +735,8 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	(goto-char (point-min))
 	(while (and (setq n (mpg123:get-music-number))
 		    (> arg 0))
-	  (if (and (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
+	  (if (and (markerp mpg123*cur-play-marker)
+		   (eq (marker-buffer mpg123*cur-play-marker) (current-buffer))
 		   (= (point) mpg123*cur-play-marker))
 	      (setq current t))
 	  (delete-region (point) (progn (forward-line 1) (point)))
@@ -694,13 +755,21 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	    (progn
 	      (delete-window stackw)
 	      (kill-buffer sb)))
-	(select-window sw))))
+	(select-window sw)
+	(if (eq ?\t (char-after (1- mpg123*end-of-list-marker)))
+	    (save-excursion
+	      (goto-char mpg123*end-of-list-marker)
+	      (delete-backward-char 1))) ;dirty hack
+	)))
 
-(defun mpg123-shuffle ()
-  "Shuffle the music!"
+(defun mpg123-shuffle (&optional method)
+  "Shuffle the music!
+From Lisp program, you can specify one of order/Inverse/Random by
+optional argument METHOD.  Set one of ?o or ?i or ?r."
   (interactive)
   (message "Shuffle music by...(O)rder, (I)nverse order, (R)andom: ")
-  (let ((c (read-char)) ord (n 0) (l (length mpg123*music-alist))
+  (let ((c (or method (read-char)))
+	ord (n 0) (l (length mpg123*music-alist))
 	r tmp buffer-read-only (p (point)))
     (cond
      ((eq c ?o)
@@ -967,7 +1036,7 @@ mpg123:
   (let ((files (mpg123:mp3-files-in-dir dir)))
     (mpg123:create-buffer files)
     (message "Let's listen to the music. Type SPC to start.")
-    ))
+    (run-hooks 'mpg123-hook)))
 
 (provide 'mpg123)
 
