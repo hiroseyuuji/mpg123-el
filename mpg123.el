@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon Oct 16 17:52:20 2000 on firestorm
-;;; Update count: 696
+;;; Last modified Fri Oct 20 23:42:45 2000 on firestorm
+;;; Update count: 698
 
 ;;[Commentary]
 ;;	
@@ -217,6 +217,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.15  2000/10/20 14:43:06  yuuji
+;; (if (featurep 'xemacs) (require 'overlay))
+;;
 ;; Revision 1.14  2000/10/16 08:52:44  yuuji
 ;; 'mpg123*cur-face renamed to 'mpg123-cur-face (For XEmacs)
 ;;
@@ -678,6 +681,8 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 (defvar mpg123*use-face t)
 (defvar mpg123*cur-overlay nil
   "Overlay to indicate playing positino")
+
+(if (featurep 'xemacs) (require 'overlay))
 (if (and (fboundp 'make-face) mpg123*use-face)
     (progn
       (make-face 'mpg123-cur-face)
