@@ -2,17 +2,16 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2003 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon Mar 31 11:31:09 2003 on firestorm
-;;; Update count: 1102
+;;; Last modified Mon Apr 28 18:18:13 2003 on firestorm
+;;; Update count: 1110
 
 ;;[News]
+;;	mpg123-set-point-for-next-song-function, mpg123-format-name-function,
+;;	mpg123-now-playing, support id3v1.1 (thanks to rene)
+;;	
 ;;	CR-LF(DOS) encoding playlist treated correctly(thanks to lenbok).
 ;;	Audio(mp3/ogg) file detection refined for XEmacs.
 ;;	Japanese messages.
-;;	New key binding `g' - goto current music line.
-;;	New key binding `W' - show current file name.
-;;	Variables `mpg123-command' and `mpg123-command-args' are changed
-;;	to mpg123-mpg123-command and mpg123-mpg123-command-args respectively.
 ;;	
 ;;[Commentary]
 ;;	
@@ -302,10 +301,18 @@
 ;;		Fixed handling of mpg123*initial-buffer.
 ;;	Len Trigg <lenbok@myrealbox.com>
 ;;		Sent a patch and report on playlist file parsing.
+;;	Rene Kyllingstad <kyllingstad@users.sourceforge.net>
+;;		Many enhancements; mpg123-set-point-for-next-song-function,
+;;		mpg123-format-name-function, using SIGTERM, id3v1.1,
+;;		mpg123-now-playing, fixes for non-mule XEmacs.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.38  2003/04/28 09:20:48  yuuji
+;; mpg123-set-point-for-next-song-function, mpg123-format-name-function,
+;; mpg123-now-playing, support id3v1.1 (thanks to Rene Kyllingstad)
+;;
 ;; Revision 1.37  2003/03/31 02:31:33  yuuji
 ;; CR-LF(DOS) encoding playlist treated correctly. (by lenbok)
 ;;
@@ -487,6 +494,10 @@ mixer調節コマンドの音量調節オプションのリスト")
 (defvar mpg123-id3-tag-function 'mpg123:peek-tag
   "*Emacs-Lisp function for extracting ID3 tag.
 MP3からID3を取得するための関数")
+(defvar mpg123-set-point-for-next-song-function nil
+  "*Return non-nil if it has set the point in the playlist for the next song to be played.
+Called when changing songs to allow playing in non-playlist order.
+1曲終わったときに次の曲の位置にポイントを動かす関数.")
 (defvar mpg123-startup-volume 30
   "*Default sound volume at startup of this program.
 mpg123.el初回起動時の音量のデフォルト値.")
@@ -495,12 +506,20 @@ mpg123.el初回起動時の音量のデフォルト値.")
 再生のデフォルトのリピート回数")
 (defvar mpg123-process-coding-system
   (cond ((and (fboundp 'modify-coding-system-alist)
-	      (intern-soft "euc-jp"))
+	      (intern-soft "euc-jp")
+	      (featurep 'mule))
 	 'euc-jp)
 	((boundp '*euc-japan*) *euc-japan*)
 	(t nil))
   "*Default process coding system for mpg123.
 mpg123コマンド用の漢字コード。漢字ファイル名があるときは必須")
+(defvar mpg123-format-name-function nil
+  "*Function to override the format of the name in the playlist.
+It is called with the arguments ARTIST, ALBUM, TITLE, TRACKNUM, FILENAME
+and shoud return the string to be displayed.
+曲リスト行の書式を決める関数。
+アーチスト、アルバム、タイトル、トラック、ファイル名
+の5つの引数を受け取り、それらを加工して1行の文字列を返す関数を定義する。")
 (defvar mpg123-omit-id3-artist nil
   "*Non-nil for omitting artist name display of ID3 tag.
 non-nilのときID3タグからのアーチスト名表示を省略する。")
@@ -625,6 +644,14 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 
 (defvar mpg123-type-alist
   '(("mp3" . "mpg123") ("ogg" . "ogg123")))
+
+(defun mpg123-now-playing ()
+  "Return name of song currently playing in mpg123, or nil"
+  (let* ((buf (and (boundp 'mpg123*buffer) (get-buffer mpg123*buffer)))
+	 (p (and buf (get-buffer-process buf)))
+	 (playingp (and p (eq (process-status p) 'run))))
+    (if playingp
+	(mpg123:get-music-info mpg123*cur-music-number 'name))))
 
 (defun mpg123:file-name-extension (name)
   (let ((md (match-data)))
@@ -1002,7 +1029,9 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		(sf (selected-frame)) mp3w p)
             (set-buffer mpg123*buffer)
             (goto-char mpg123*cur-play-marker)
-            (mpg123-next-line 1)
+	    (or (and (fboundp mpg123-set-point-for-next-song-function)
+		     (funcall mpg123-set-point-for-next-song-function))
+		(mpg123-next-line 1))
 	    (sit-for 0)
             (if (and (not (mpg123:in-music-list-p))
                      (mpg123:repeat-check)) ;decrement counter and check
@@ -1222,7 +1251,9 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
   (let ((retry (if (fboundp 'float) 50 5))) ;retry in seconds
     (while (and p (eq (process-status p) 'run)
 		(>= (setq retry (1- retry)) 0))
-      (interrupt-process p)
+      (if (featurep 'xemacs)
+	  (process-send-signal 'SIGTERM p)
+	(interrupt-process p))
       (if (fboundp 'float)
 	  (sit-for (string-to-number "0.1"))
 	(sit-for 1))
@@ -1251,10 +1282,7 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	music)
     (if (and p (eq (process-status p) 'run))
 	(progn
-	  ;(interrupt-process p)
-	  ;(sit-for 1)
-	  ;(mpg123:sure-kill p)
-	  (mpg123:kill-current-music)
+	  (mpg123:kill-current-music p)
 	  (message "PAUSE!")
 	  (setq now-stopped t)))
     (if (and now-stopped
@@ -1880,7 +1908,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
   "Try peeking id3tag from FILE"
   (let ((sz (nth 7 (file-attributes (file-truename file))))
 	(b (get-buffer-create " *mpg123 tag tmp*"))
-	title artist)
+	title artist album tracknum)
     (save-excursion
       (set-buffer b)
       (erase-buffer)
@@ -1895,13 +1923,30 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 	    (insert-file-contents file nil (- sz 95) (- sz 65))
 	    (mpg123:squeeze-spaces-buffer)
 	    (setq artist (buffer-string))
+	    (erase-buffer)
+	    (insert-file-contents file nil (- sz 65) sz)
+	    (setq album (buffer-substring 1 (1- (or (search-forward "\000" 31 t) 32))))
+	    ;; id3v1.1 last byte of comment is tracknum (if prev byte is null):
+	    (let ((track (string-to-char (buffer-substring 64 65))))
+	      (if (and (= (string-to-char (buffer-substring 63 64)) ?\000)
+		       (not (= track ?\000)))
+		  (setq tracknum (int-to-string (char-int track)))))
+	    ;; common hack: comment is "Track num" 
+	    (if tracknum
+		nil
+	      (goto-char 35)
+	      (if (looking-at "Track \\([0-9]+\\)")
+		  (setq tracknum
+			(buffer-substring (match-beginning 1) (match-end 1)))))
 	    (kill-buffer b)
-	    (concat (if (string< "" title) title
-		      (file-name-nondirectory file))
-		    (if (or mpg123-omit-id3-artist
-			    (string= artist ""))
-			""
-		      (concat " by " artist))))
+	    (if (fboundp mpg123-format-name-function)
+		(funcall mpg123-format-name-function artist album title tracknum (file-name-nondirectory file)) 
+	      (concat (if (string< "" title) title
+			(file-name-nondirectory file))
+		      (if (or mpg123-omit-id3-artist
+			      (string= artist ""))
+			  ""
+			(concat " by " artist)))))
 	(kill-buffer b)
 	(setq file (file-name-nondirectory file))
 	(if (fboundp 'code-convert-string)
@@ -2266,6 +2311,21 @@ the music will immediately move to that position."
 	  (call-process mpg123-mixer-command nil b nil "-w" "q")
 	  (goto-char (point-min))
 	  (if (re-search-forward "pcm *\\([0-9]+\\), *\\([0-9]+\\)" nil t)
+	      (let ((left (buffer-substring
+			   (match-beginning 1) (match-end 1)))
+		    (right (buffer-substring
+			    (match-beginning 2) (match-end 2))))
+		(setq vol (cons (string-to-int left) (string-to-int right))))
+	    (setq vol "unknown"))
+	  (setq mpg123*cur-volume vol)))
+       ((eq mpg123-system-type 'nt)
+	(let ((b (get-buffer-create " *mpg123 mixer* "))
+	      vol)
+	  (set-buffer b)
+	  (erase-buffer)
+	  (call-process mpg123-mixer-command nil b nil)
+	  (goto-char (point-min))
+	  (if (re-search-forward "\\([0-9]+\\):\\([0-9]+\\)" nil t)
 	      (let ((left (buffer-substring
 			   (match-beginning 1) (match-end 1)))
 		    (right (buffer-substring
