@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Oct 20 23:42:45 2000 on firestorm
-;;; Update count: 698
+;;; Last modified Sat Nov 25 00:00:57 2000 on firestorm
+;;; Update count: 702
 
 ;;[Commentary]
 ;;	
@@ -217,6 +217,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.16  2000/11/24 15:09:22  yuuji
+;; Support emacs-21.0.9x (in mpg123:mp3-p)
+;;
 ;; Revision 1.15  2000/10/20 14:43:06  yuuji
 ;; (if (featurep 'xemacs) (require 'overlay))
 ;;
@@ -407,12 +410,15 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
     ;;check file size > 128
     (and (> (nth 7 (file-attributes (file-truename f))) 128)
 	 (let ((b (set-buffer (get-buffer-create " *mpg123tmp*"))) e0 b0
-	       (file-coding-system-alist (list (cons "." 'no-conversion))) ;20
+	       (file-coding-system-alist (list (cons "." 'no-conversion)))
 	       (file-coding-system
 		(if (and (boundp '*noconv*) (coding-system-p '*noconv*))
 		    '*noconv*		;mule19
 		  'no-conversion))	;XEmacs(maybe)
-	       (file-coding-system-for-read '*noconv*)) ;19
+	       (file-coding-system-for-read '*noconv*) ;19
+	       (skipchars (if (string-match "^21\\.0\\.9" emacs-version)
+			      "\000-\177"
+			    "^\xff")))
 	   (set-buffer b)
 	   (erase-buffer)
 	   (insert "..")		;dummy dot to simplify the while loop
@@ -431,7 +437,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 				    ?\xF0))
 			    (throw 'found t))
 			(goto-char e0))
-		    (while (> (skip-chars-forward "^\xff") 0) ;Scan `0xff'
+		    (while (> (skip-chars-forward skipchars) 0) ;Scan `0xff'
 		      (if (and (char-after (1+ (point)))
 			       (= (logand (char-after (1+ (point)))
 					  ?\xF0) ?\xF0))
