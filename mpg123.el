@@ -2,39 +2,45 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Sep 14 21:58:47 2002 on firestorm
-;;; Update count: 954
+;;; Last modified Thu Sep 19 01:36:24 2002 on firestorm
+;;; Update count: 1002
 
 ;;[News]
-;;	Key binding to Delete-file is changed from `C-d' to `D'.
+;;	Support OggVorbis (thanks to Andreas Fuchs <asf@acm.org>)
+;;	Rewind key `B' `b' move to previous music if they reache 00:00
+;;	Variables `mpg123-command' and `mpg123-command-args' are changed
+;;	to mpg123-mpg123-command and mpg123-mpg123-command-args respectively.
 ;;	
 ;;[Commentary]
 ;;	
-;;	This package is a front-end program to mpg123 audio player.
-;;	mpg123の再生フロントエンドです。
+;;	This package is a front-end program to mpg123/ogg123 audio player.
+;;	mpg123/ogg123 の再生フロントエンドです。
 ;;	
 ;;[Requirement]
 ;;	
-;;	The `mpg123' program version 0.59q or later, and enough CPU
-;;	power to run it.
-;;	mpg123 0.59qとそれを走らすのに十分なCPUパワー。
-;;	最低でもMMX??
+;;	The `mpg123' program version 0.59q or later, or ogg123 version
+;;	1.0 or later, and enough CPU power to run it.
+;;	mpg123 0.59q以降 や ogg123 1.0以降 とそれを走らすのに十分な
+;;	CPUパワー。最低でもMMX??
 ;;	
 ;;[Installation]
 ;;	
-;;	You have to install mpg123 0.59q or later first, and get it work
-;;	fine.   Check `mpg123  -v' option  if it  displays  the decoding
-;;	frame number or not.  If it looks good, then the preparation has
-;;	been  done.    Install  this  emacs-lisp   into  your  load-path
-;;	directory.  And put the expression below into your ~/.emacs.
+;;	You have to install mpg123 0.59q or later, ogg123 1.0 or later
+;;	first, and get they work fine.  Check `mpg123 -v' or `ogg123 -v'
+;;	option if it displays the decoding frame number or not.  If it
+;;	looks good, then the preparation has been done.  Install this
+;;	emacs-lisp into your load-path directory.  And put the
+;;	expression below into your ~/.emacs.
 ;;	
 ;;	  [~/.emacs]
 ;;		(autoload 'mpg123 "mpg123" "A Front-end to mpg123" t)
 ;;	
-;;	まず、mpg123の正常動作を確認してから上の行を~/.emacsに追加します。
-;;	なおmpg123は0.59q以上でないと正常に動作しない可能性があります(もっ
-;;	と新しいのが出たらまた怪しいかもしれん…)。mpg123 に -v オプショ
-;;	ンをつけて起動し音楽の再生とともにデコード中のフレーム番号が画面
+;;	まず、mpg123あるいはogg123の正常動作を確認してから上の行を~
+;;	/.emacsに追加します。なおmpg123は0.59q以上でないと正常に動作しな
+;;	い可能性があります(もっと新しいのが出たらまた怪しいかもしれん…)。
+;;	ogg123は1.0で動作確認してますがそれ以外でも大丈夫でしょう。
+;;	mpg123(または ogg123)コマンド に -v オプションをつけて起動し音楽
+;;	の再生とともにデコード中のフレーム番号(ogg123の場合は秒数)が画面
 ;;	に表示されるかどうか確認してください。これがうまく行かないとこの
 ;;	プログラムもうまく動きません。
 ;;	
@@ -42,8 +48,9 @@
 ;;	
 ;;	It is  assumed that you  already have MPEG1  audio LayerI/II/III
 ;;	files - you might be only  familiar with MPEG1 Layer III aka mp3
-;;	- in the  certain directory.  This program plays  all music in A
-;;	direcotry.  If you want to listen, exec Emacs and type:
+;;	-  or Ogg  format music  files in  the certain  directory.  This
+;;	program plays all music in  A direcotry.  If you want to listen,
+;;	exec Emacs and type:
 ;;	
 ;;		M-x mpg123 RET
 ;;		SomeMP3DirectoryName (or playlist file) RET
@@ -54,9 +61,9 @@
 ;;	
 ;;	既に MPEG1 audio Layer I/II/III ファイルは持ってるものとして説明
 ;;	します(たぶんいわゆるMP3しか持ってないと思うけど気にしないわしも
-;;	Layer2と3は作ったことすらない)。で、そのファイルはきっとどこかの
-;;	ディレクトリに整理しておいてあると思うので、音楽を聞きたくなった
-;;	ら、まずEmacsを起動し、
+;;	Layer2と3は作ったことすらない)。Ogg形式でももちろんおっけーよ。
+;;	で、そのファイルはきっとどこかのディレクトリに整理しておいてある
+;;	と思うので、音楽を聞きたくなったら、まずEmacsを起動し、
 ;;	
 ;;		M-x mpg123 ぺし
 ;;		ディレクトリ名 (またはプレイリストファイル名) ぺし
@@ -101,10 +108,14 @@
 ;;	Here are the variables for your customization.
 ;;	
 ;;	  [Variable]		[Default value/Meaning]
-;;	  mpg123-command	"mpg123"
+;;	  mpg123-mpg123-command	"mpg123"
 ;;				Command name of mpg123
-;;	  mpg123-command-args	nil
+;;	  mpg123-mpg123-command-args	nil
 ;;				Argument list to pass mpg123 command
+;;	  mpg123-ogg123-command	"ogg123"
+;;				Command name of ogg123
+;;	  mpg123-ogg123-command-args	nil
+;;				Argument list to pass ogg123 command
 ;;	  mpg123-mixer-command	"mixer"
 ;;				Command name of mixer(FreeBSD)
 ;;	  mpg123-preserve-playtime t
@@ -164,6 +175,31 @@
 ;;	に半分隠れてるフレームでmpg123を走らせながら書いてます。
 ;;	windows.el は http://www.gentei.org/~yuuji/software/ からどうぞ。
 ;;	
+;;[For Extension]
+;;	
+;;	If you want to make an extension to support other sound format
+;;	and its player, you should define some variables and functions.
+;;	Suppose ".foo" is sound file name suffix, and "foo123" is its
+;;	player software.  Define as follows;
+;;	
+;;	mpg123-type-alist	Add cons of '("foo" . "foo123").
+;;				This automaticall utilize variables
+;;				and functions below.
+;;	mpg123-foo123-command	"foo123"
+;;	mpg123-foo123-command-args
+;;	mpg123-foo123-time-regexp
+;;	mpg123-foo123-init-frame-regexp
+;;	mpg123-foo123-frame-regexp
+;;	mpg123-foo123-convert-frame	Func: frame to serial number
+;;	
+;;	And you have to add modifications to these funcs and vars.
+;;	
+;;	mpg123:peek-tag, mpg123*time2frame-ratio-alist
+;;	
+;;	You may have to create functions as follows;
+;;	
+;;	mpg123:foo-p, mpg123:foo123-peek-tag
+;;	
 ;;[Bugs]
 ;;	
 ;;	It is  perhaps only on  my system that sometimes  mpg123 command
@@ -199,7 +235,7 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2000/12現在)。
+;;	下のアドレスまでお願いします(2002/9現在)。
 ;;							yuuji@gentei.org
 ;;[Acknowledgements]
 ;;	
@@ -253,8 +289,16 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.29  2002/09/18 17:22:05  yuuji
+;; Peek ogg's comment directly.
+;; Revise document.
+;;
 ;; Revision 1.28  2002/09/14 12:59:08  yuuji
 ;; OggVorbis supported.
+;;
+;; Revision 1.27  2002/09/14 12:55:52  yuuji
+;; B/b rewind to the previous music if it reaches at the beginning of the
+;; music.
 ;;
 ;; Revision 1.26  2002/04/08 03:57:25  yuuji
 ;; IRIX 6.3 OK
@@ -399,11 +443,11 @@ mpg123コマンド用の漢字コード。漢字ファイル名があるときは必須")
 (defvar mpg123-omit-id3-artist nil
   "*Non-nil for omitting artist name display of ID3 tag.
 non-nilのときID3タグからのアーチスト名表示を省略する。")
-(defvar mpg123-mp3-scan-bytes 3
-  "*Default number of bytes of header to examine the file is mp3 or not.
-MP3ファイルかどうかを調べるために読み込むファイルの先頭のバイト数")
+(defvar mpg123-mp3-scan-bytes 4
+  "*Default number of bytes of header to examine the file is mp3/Ogg or not.
+MP3/Oggファイルかどうかを調べるために読み込むファイルの先頭のバイト数")
 
-(defvar mpg123-lazy-check "\\(\\.ogg$\\|\\.mp3\\)"
+(defvar mpg123-lazy-check nil  ;;"\\(\\.ogg$\\|\\.mp3\\)"
   "*Check sound file or not by filename.
 If want to check by filename, set this variable to filename regexp.
 MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
@@ -442,6 +486,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "S" 'mpg123-save-playlist)
 (define-key mpg123-mode-map "D" 'mpg123-delete-file)
 (define-key mpg123-mode-map "E" 'mpg123-id3-edit)
+(define-key mpg123-mode-map "W" 'mpg123-what-file)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
 (define-key mpg123-mode-map "Q" 'mpg123-quit-yes)
 (if (and window-system)
@@ -498,25 +543,23 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123-ogg123-time-regexp "Time: \\(..:..\\)... +\\[..:.....\\] of \\([0-9][0-9]:[0-9][0-9]\\)")
 (defvar mpg123-ogg123-frame-regexp "Time: \\(..:..\\)... +\\[..:.....\\]")
 (defvar mpg123-ogg123-init-frame-regexp " of \\(..:..\\)...")
+(defvar mpg123:time-regexp nil)
+(defvar mpg123:frame-regexp nil)
+(defvar mpg123:init-frame-regexp nil)
+(defvar mpg123*convert-frame-function nil)
+(defvar mpg123*cur-total-frame nil)
+(defvar mpg123*indicator-overlay nil)
+(defvar mpg123*cur-overlay nil "Overlay to cursor of playing position")
+(defvar mpg123*slider-overlay nil "Overlay of playing position slider")
+
+
+(defvar mpg123*window-width nil)
+(defvar mpg123*cur-total-frame nil)
+(defvar mpg123*cur-slider-column nil)
+(defvar mpg123*initial-buffer nil)
 
 (defvar mpg123-type-alist
   '(("mp3" . "mpg123") ("ogg" . "ogg123")))
-;;    (list "mp3"
-;; 	 (list "mpg123")
-;; 	 mpg123-mpg123-time-regexp
-;; 	 mpg123-mpg123-init-frame-regexp
-;; 	 mpg123-mpg123-frame-regexp
-;; 	 'mpg123:time2frame
-;; 	 'string-to-number
-;; 	 'mpg123:peek-id3-tag)
-;;    (list "ogg"
-;; 	 (list "ogg123") ;; "-d" "oss"
-;; 	 mpg123-ogg123-time-regexp
-;; 	 mpg123-ogg123-init-frame-regexp
-;; 	 mpg123-ogg123-frame-regexp
-;; 	 'mpg123:time2second
-;; 	 'mpg123:time2second-num
-;; 	 'mpg123*ogg123-peek-tag)))
 
 (defun mpg123:file-name-extension (name)
   (let ((md (match-data)))
@@ -569,13 +612,33 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defun mpg123-ogg123-convert-frame (time filename)
   "Return (mpg123:time2frame TIME FILENAME)"
   (string-to-int (mpg123:time2frame time filename)))
-  
+
+;;;
+;; Functions related to sound file format inspection
+;;;
+(defun mpg123:hex-value (point length &optional little-endian)
+  "Return the hex value the POINT positions LENGTH byte stream represents.
+Optional third argument LITTLE-ENDIAN is self extplanatory."
+  (setq point (1+ point)) ;translate file offset to Emacs's point value
+  (let ((mlt 1)
+	(pos (if little-endian point (+ point length -1)))
+	(direc (if little-endian 1 -1))
+	(value 0))
+    (while (> length 0)
+      (setq value (+ value (* mlt (char-after pos)))
+	    pos (+ pos direc)
+	    mlt (* mlt 256)
+	    length (1- length)))
+    value))
+
 (defun mpg123:peek-tag (file)
   "Should be REWRITEN!!!!"
   (let ((type (mpg123:get-sound-type file)))
     (cond
      ((string-equal type "mpg123") (mpg123:peek-id3-tag file))
      ((string-equal type "ogg123") (mpg123:ogg123-peek-tag file))
+     ((mpg123:mp3-p file) (mpg123:peek-id3-tag file))
+     ((mpg123:ogg-p file) (mpg123:ogg123-peek-tag file))
      (t "Unknown File"))))
 
 (defun mpg123:mp3-skip-id3v2 ()
@@ -592,18 +655,22 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 	  4)))
     (goto-char (1- (point)))))
 
-(defun mpg123:mp3-p (f)
-  "Check the file F is MPEG 1 Audio file or not."
+(defun mpg123:insert-raw-file-contents (&rest args)
+  (let ((file-coding-system-alist (list (cons "." 'no-conversion)))
+	(file-coding-system
+	 (if (and (boundp '*noconv*) (coding-system-p '*noconv*))
+	     '*noconv*		;mule19
+	   'no-conversion))	;XEmacs(maybe)
+	(file-coding-system-for-read '*noconv*)) ;19
+    (apply 'insert-file-contents args)))
+  
+(defun mpg123:mp3-p (f &optional pattern)
+  "Check the file F is MPEG 1 Audio file or not.
+If optional argument PATTERN given, search it(tentative)."
   (save-excursion
     ;;check file size > 128
     (and (> (nth 7 (file-attributes (file-truename f))) 128)
 	 (let ((b (set-buffer (get-buffer-create " *mpg123tmp*"))) e0 b0
-	       (file-coding-system-alist (list (cons "." 'no-conversion)))
-	       (file-coding-system
-		(if (and (boundp '*noconv*) (coding-system-p '*noconv*))
-		    '*noconv*		;mule19
-		  'no-conversion))	;XEmacs(maybe)
-	       (file-coding-system-for-read '*noconv*) ;19
 	       (skipchars (if (and (not (featurep 'xemacs))
 				   (string< "21" emacs-version))
 			      "\000-\177"
@@ -611,12 +678,15 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 	   (set-buffer b)
 	   (erase-buffer)
 	   (insert "..")		;dummy dot to simplify the while loop
-	   (insert-file-contents f nil 0 mpg123-mp3-scan-bytes)
+	   (mpg123:insert-raw-file-contents f nil 0 mpg123-mp3-scan-bytes)
 	   (goto-char (point-min))
 	   (prog1	; if short & 0xfff0 = 0xfff0, it is MPEG audio
 	       (or
 		(looking-at "\\.\\.ID3")
 		(catch 'found
+		  (if (stringp pattern)
+		      (throw 'found
+			(re-search-forward pattern nil t)))
 		  (if (string-match "^19\\." emacs-version)
 		      (while (search-forward "\xff" nil t) ;Scan `0xff'
 			(setq e0 (match-end 0) b0 (match-beginning 0))
@@ -633,10 +703,15 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 			  (throw 'found t))))))
 	     (kill-buffer b))))))
 
+(defun mpg123:ogg-p (f)
+  (let ((case-fold-search nil))
+    (mpg123:mp3-p f "OggS")))
+
 (defun mpg123:sound-p (f)
   (or (and mpg123-lazy-check (stringp mpg123-lazy-check)
 	   (string-match mpg123-lazy-check (file-name-nondirectory f)))
-      (mpg123:mp3-p f)))
+      (mpg123:mp3-p f)
+      (mpg123:ogg-p f)))
 
 (defun mpg123-next-line (arg)
   "Down line"
@@ -766,10 +841,6 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 (スペースキーでオサラバ)
 ***********************************************************" (point)))
   
-(defvar mpg123:time-regexp nil)
-(defvar mpg123:frame-regexp nil)
-(defvar mpg123*convert-frame-function nil)
-
 (defun mpg123:initial-filter (proc mess)
   "mpg123 process filter No.1, called at startup of mpg123."
   (let ((targetfile mpg123*cur-music-file))
@@ -800,10 +871,6 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	 (mpg123:get-music-info mpg123*cur-music-number 'frames)
 	 (set-process-filter proc 'mpg123:filter))))
 
-(defvar mpg123*window-width nil)
-(defvar mpg123*cur-total-frame nil)
-(defvar mpg123*cur-slider-column nil)
-
 ;; (defun mpg123:move-slider (column)
 ;;   "Move slider to COLUMN"
 ;;   (let ((left (overlay-start mpg123*indicator-overlay)))
@@ -822,7 +889,6 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	      (and (not (string= s mpg123*cur-playtime))
 		   (not mpg123*time-setting-mode)
 		   (mpg123:update-playtime (setq mpg123*cur-playtime s)))))
-(setq foo mess)
 	(if (string-match mpg123:frame-regexp mess)
 	    (let (c)
 	      (setq mpg123*cur-playframe
@@ -942,9 +1008,6 @@ Set this as '(FGCOLOR . BGCOLOR)
 演奏中の曲の相対位置を示す曲リスト下部のインジケータ内スライダーの色
 mpg123-face-playing のDOC-STRINGも参照せよ")
 
-(defvar mpg123*cur-overlay nil "Overlay to cursor of playing position")
-(defvar mpg123*slider-overlay nil "Overlay of playing position slider")
-
 (if (featurep 'xemacs) (require 'overlay))
 (if (and (fboundp 'make-face) mpg123*use-face)
     (progn
@@ -990,7 +1053,8 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
   (if (or (not (looking-at "[0-9]"))
 	  (not (mpg123:in-music-list-p)))
       nil ;;if not on music line, then exit
-    (let (music p)
+    (let ((continue (equal mpg123*cur-music-number (mpg123:get-music-number)))
+	  music p)
       (setq mpg123*cur-music-number (mpg123:get-music-number)
 	    mpg123*cur-total-frame (mpg123:get-music-info
 				    mpg123*cur-music-number 'frames))
@@ -1014,7 +1078,8 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	(let ((time (buffer-substring
 		     (point)
 		     (progn (skip-chars-forward "^ /")(point)))))
-	  (if (and (string= time mpg123*cur-playtime) mpg123*cur-playframe)
+	  (if (and (string= time mpg123*cur-playtime)
+		   mpg123*cur-playframe continue)
 	      (setq mpg123*cur-start-frame
 		    (int-to-string mpg123*cur-playframe))
 	    (setq mpg123*cur-start-frame
@@ -1722,62 +1787,87 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (save-excursion
       (set-buffer b)
       (erase-buffer)
-      (insert-file-contents file nil (- sz 128) (- sz 125))
+      (mpg123:insert-raw-file-contents file nil (- sz 128) (- sz 125))
       (if (looking-at "TAG")
 	  (progn
 	    (erase-buffer)
-	    (insert-file-contents file nil (- sz 125) (- sz 95))
+	    (mpg123:insert-raw-file-contents file nil (- sz 125) (- sz 95))
 	    (mpg123:squeeze-spaces-buffer)
 	    (setq title (buffer-string))
 	    (erase-buffer)
-	    (insert-file-contents file nil (- sz 95) (- sz 65))
+	    (mpg123:insert-raw-file-contents file nil (- sz 95) (- sz 65))
 	    (mpg123:squeeze-spaces-buffer)
 	    (setq artist (buffer-string))
 	    (kill-buffer b)
-	    (concat (if (string< "" title) title "UnknownTitle")
-		    (or mpg123-omit-id3-artist
-			(concat " by "
-				(if (string< "" artist)
-				    artist "UnknownArtist")))))
+	    (concat (if (string< "" title) title
+		      (file-name-nondirectory file))
+		    (if (or mpg123-omit-id3-artist
+			    (string= artist ""))
+			""
+		      (concat " by " artist))))
 	(kill-buffer b)
 	(setq file (file-name-nondirectory file))
 	(if (fboundp 'code-convert-string)
 	    (code-convert-string file mpg123-process-coding-system *internal*)
 	  (file-name-nondirectory file))))))
 
-(defun mpg123:ogg123-tag-search (tag-name &optional preservep)
-  (let ((cursorpos (and preservep
-			(point)))
-	(tag-val (and (re-search-forward (concat "^" tag-name  "=\\(.+\\)$") (point-max) t)
-		      (buffer-substring
-		       (match-beginning 1)
-		       (match-end 1)))))
-    (goto-char (or cursorpos
-		   (point)))
-    tag-val))
-
 (defun mpg123:ogg123-peek-tag (file)
-  (let* ((tmp-buffer-name " *mpg123 tag tmp* ")
-	(b (get-buffer-create tmp-buffer-name))
-	title artist)
+  "Peek ogg comment area.
+cf. NetBSD:/usr/share/misc/magic
+# Then come the comments, again length-counted (and number-counted).
+# Some looping constructs and registers would allow reading them but now
+# it's impossible.  However we can print the number of comments present
+# (skipping by the vendor string length):
+##>>>>(109.l.113)       lelong          0               \b, no comments
+##>>>>(109.l+113)       lelong          >0              \b, %lu comments"
+
+  (let ((tmpbuf (get-buffer-create " *mpg123 tag tmp* "))
+	(case-fold-search t)
+	versionlen num-comments comment-len
+	(ofs 109) (peekbytes 256)	;is 256 enough??
+	(basename (file-name-nondirectory file))
+	pt commenthead title artist)
     (save-excursion
-      (set-buffer b)
+      (set-buffer tmpbuf)
       (erase-buffer)
-      (call-process "vorbiscomment" nil tmp-buffer-name nil "-l" file)
-      (goto-char (point-min))
-      (let ((title (mpg123:ogg123-tag-search "title" t))
-	    (artist (mpg123:ogg123-tag-search "artist")))
-	(while (setq next-artist (mpg123:ogg123-tag-search "artist"))
-	  (setq artist (concat artist ", "
-			       next-artist)))
-	(kill-buffer (current-buffer))
-	(if title
-	    (concat
-	     title
-	     (if mpg123-omit-id3-artist
-		 ""
-	       (concat " by " artist)))
-	  (file-name-nondirectory file))))))
+      (mpg123:insert-raw-file-contents file nil ofs (+ ofs peekbytes))
+      (if (= 0 (setq versionlen (mpg123:hex-value 0 4 'little-endian)))
+	  ;; if no version header, I don't understand it..., return basename 
+	  basename
+	(setq pt (+ 4 versionlen))	;4 is long-int width
+	(if (<= (setq num-comments (mpg123:hex-value pt 4 'little-endian))
+		0)
+	    ;; if no comments found, return basename
+	    basename
+	  ;; Let's go into byte stream
+	  (setq commenthead (+ pt 4))	;4 for long-int of [num-comments]
+	  ;; [length(Long)][VAR=Value][Length(Long)][VAR=Value]...
+	  ;; repeats num-comments times
+	  (while (> num-comments 0)
+	    (setq comment-len (mpg123:hex-value commenthead 4 'little-endian))
+	    (goto-char (+ 4 commenthead 1))
+	    (cond
+	     ((looking-at "artist=")
+	      (setq artist (cons
+			    (buffer-substring
+			     (+ 7 (point)) (+ comment-len (point)))
+			    artist)))
+	     ((looking-at "title=")
+	      (setq title (cons
+			   (buffer-substring
+			    (+ 6 (point)) (+ comment-len (point)))
+			   title))))
+	    (setq commenthead (+ commenthead 4 comment-len)
+		  num-comments (1- num-comments)))
+	  (setq artist (mapconcat 'concat (nreverse artist) ", ")
+		title  (mapconcat 'concat (nreverse title) ", "))
+	  (if (string< "" title)
+	      (concat title
+		      (if (and (string< "" artist)
+			       (not mpg123-omit-id3-artist))
+			  (concat " by " artist)
+			""))
+	    basename))))))
 
 (defun mpg123:insert-help ()
   "Insert help string to current buffer."
@@ -1839,8 +1929,6 @@ the music will immediately move to that position.
 	mpg123*cur-start-frame "0"
 	mpg123*cur-playframe nil)
   (use-local-map mpg123-mode-map))
-
-(defvar mpg123*indicator-overlay nil)
 
 (defun mpg123:create-buffer (files)
   "Create play-buffer"
@@ -2042,13 +2130,24 @@ the music will immediately move to that position.
   (interactive "p")
   (mpg123-volume-increase (- arg)))
 
+(defun mpg123-what-file (arg)
+  "Return the file name of this line"
+  (interactive "P")
+  (if (mpg123:in-music-list-p)
+      (let ((n (mpg123:get-music-number)))
+	(message
+	 "Music[%d]: %s"
+	 n
+	 (funcall
+	  (if arg 'abbreviate-file-name 'file-name-nondirectory)
+	  (mpg123:get-music-info n 'filename))))))
+
 (defun mpg123:initialize ()
   (if (get 'mpg123:initialize 'done)
       nil
     (mpg123:set-volume mpg123-startup-volume)
     (put  'mpg123:initialize 'done t)))
 
-(defvar mpg123*initial-buffer nil)
 (setq mpg123*initial-buffer (current-buffer))
 
 ;; 
@@ -2060,8 +2159,7 @@ the music will immediately move to that position.
     (if (and (and p (eq (process-status p) 'run))
 	     (= (save-excursion (beginning-of-line) (point))
 		 (save-excursion (goto-char mpg123*cur-play-marker) (point))))
-	(progn (ding)
-	       (message "Do not edit playing file!"))
+	(error "Do not edit playing file!")
       (beginning-of-line)
       (setq mpg123*cur-edit-marker (point-marker))
       (id3-edit))))
