@@ -1,9 +1,9 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123
-;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2001 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Tue Jan 30 12:35:52 2001 on firestorm
-;;; Update count: 815
+;;; Last modified Wed Feb 21 12:30:29 2001 on firestorm
+;;; Update count: 820
 
 ;;[Commentary]
 ;;	
@@ -236,9 +236,14 @@
 ;;	Seiichi Namba <sn@asahi-net.email.ne.jp>
 ;;		Many collaboration codes for working with dired-dd.
 ;;		Made dired-dd-mpg123.
+;;	Serge Arsenault <boggles@openface.ca>
+;;		Sent information on OpenBSD.
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.21  2001/02/21 03:41:10  yuuji
+;; Support for OpenBSD is confirmed.
+;;
 ;; Revision 1.20  2001/01/30 03:35:54  yuuji
 ;; (Win)convert music filename to dos file name for music over shared folder
 ;;
@@ -318,13 +323,15 @@ mpg123のコマンド名。0.59qが必要。")
   "*Arguments to give to mpg123")
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
-	     '((freebsd . "mixer") (netbsd . "mixerctl") (linux . "aumix")
+	     '((freebsd . "mixer") (netbsd . "mixerctl") (openbsd . "mixerctl")
+	       (linux . "aumix")
 	       (solaris . "audioctl") (nt . "mixer.exe"))))
   "*Command name for mixer setting utility
 mixer調節用コマンド")
 (defvar mpg123-mixer-setvol-target-list
   (cdr (assq mpg123-system-type
 	     '((freebsd . ("vol" "pcm")) (netbsd . ("outputs.master"))
+	       (openbsd . ("outputs.master"))
 	       (linux . ("-w"))
 	       (solaris . ("-v")) (nt . ("-v")))))
   "*Option list for volume setting utility.
@@ -1682,7 +1689,7 @@ the music will immediately move to that position.
 		(setq vol (cons (string-to-int left) (string-to-int right))))
 	    (setq vol "unknown"))
 	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-system-type 'netbsd)
+       ((memq mpg123-system-type '(netbsd openbsd))
 	(let ((b (get-buffer-create " *mpg123 mixer* "))
 	      vol)
 	  (set-buffer b)
@@ -1720,7 +1727,8 @@ the music will immediately move to that position.
   "Set volume"
   (if (integerp vollist) (setq vollist (cons vollist vollist)))
   (if (and mpg123-mixer-command
-	   (memq mpg123-system-type '(freebsd netbsd linux solaris nt)))
+	   (memq mpg123-system-type
+		 '(freebsd netbsd openbsd linux solaris nt)))
       (let*((l mpg123-mixer-setvol-target-list)
 	    (ctl-type (string-match "mixerctl" mpg123-mixer-command))
 	    (v (format "%d%c%d"
