@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Sep 13 21:19:52 2002 on firestorm
-;;; Update count: 885
+;;; Last modified Sat Sep 14 21:58:47 2002 on firestorm
+;;; Update count: 954
 
 ;;[News]
 ;;	Key binding to Delete-file is changed from `C-d' to `D'.
@@ -247,12 +247,14 @@
 ;;		Sent a patch to restore cursor position after id3-edit.
 ;;	HIROSE Yoshihide <yoshihide@fast.co.jp>
 ;;		Report and sent a patch for IRIX6.
+;;	Andreas Fuchs <asf@acm.org>
+;;		Support OggVorbis.
 ;;
 ;;
 ;;[History]
 ;; $Log$
-;; Revision 1.27  2002/09/14 12:55:52  yuuji
-;; B/b rewind to the previous music if it reaches at the beginning of the music.
+;; Revision 1.28  2002/09/14 12:59:08  yuuji
+;; OggVorbis supported.
 ;;
 ;; Revision 1.26  2002/04/08 03:57:25  yuuji
 ;; IRIX 6.3 OK
@@ -347,12 +349,18 @@
    ((string-match "nt4\\|windows9" (emacs-version)) 'nt)
    ((string-match "solaris" (emacs-version))	'solaris)))
 
-(defvar mpg123-command "mpg123"
+(defvar mpg123-mpg123-command "mpg123"
   "*Command name of mpg123 player. Need 0.59q or later.
 mpg123のコマンド名。0.59qが必要。")
-(defvar mpg123-command-args nil
+(defvar mpg123-mpg123-command-args nil
   ;;'("--8bit -m")	;<- example
   "*Arguments to give to mpg123")
+(defvar mpg123-ogg123-command "ogg123"
+  "*Command name of ogg123 player.
+ogg123のコマンド名")
+(defvar mpg123-ogg123-command-args nil
+  ;;'("-d oss")	;<- example
+  "*Arguments to give to ogg123")
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
 	     '((freebsd . "mixer") (netbsd . "mixerctl") (openbsd . "mixerctl")
@@ -360,6 +368,7 @@ mpg123のコマンド名。0.59qが必要。")
 	       (solaris . "audioctl") (nt . "mixer.exe"))))
   "*Command name for mixer setting utility
 mixer調節用コマンド")
+(defvar mpg123-default-dir "~/mp3")
 (defvar mpg123-mixer-setvol-target-list
   (cdr (assq mpg123-system-type
 	     '((freebsd . ("vol" "pcm")) (netbsd . ("outputs.master"))
@@ -394,7 +403,7 @@ non-nilのときID3タグからのアーチスト名表示を省略する。")
   "*Default number of bytes of header to examine the file is mp3 or not.
 MP3ファイルかどうかを調べるために読み込むファイルの先頭のバイト数")
 
-(defvar mpg123-lazy-check nil
+(defvar mpg123-lazy-check "\\(\\.ogg$\\|\\.mp3\\)"
   "*Check sound file or not by filename.
 If want to check by filename, set this variable to filename regexp.
 MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
@@ -461,7 +470,9 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*buffer "*mpg123*")
 (defvar mpg123*info-buffer " *mpg123 info* ")
 (defvar mpg123*cur-music-number nil)
+(defvar mpg123*cur-music-file nil)
 (defvar mpg123*cur-playtime nil)
+(defvar mpg123*cur-playframe nil)
 (defvar mpg123*cur-playframe nil)
 (defvar mpg123*cur-start-frame "0")
 (defvar mpg123*cur-play-marker nil)
@@ -480,6 +491,92 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123-url-regexp "http://.*"
   "*Regular expression to match to URL requests")
 
+(defvar mpg123-mpg123-time-regexp  "Time: \\(..:..\\)... +\\[\\(..:..\\)")
+(defvar mpg123-mpg123-init-frame-regexp "Frame# *[0-9]+ *\\[\\([ 0-9]+\\]\\)")
+(defvar mpg123-mpg123-frame-regexp "Frame# *\\([0-9]+\\) *")
+
+(defvar mpg123-ogg123-time-regexp "Time: \\(..:..\\)... +\\[..:.....\\] of \\([0-9][0-9]:[0-9][0-9]\\)")
+(defvar mpg123-ogg123-frame-regexp "Time: \\(..:..\\)... +\\[..:.....\\]")
+(defvar mpg123-ogg123-init-frame-regexp " of \\(..:..\\)...")
+
+(defvar mpg123-type-alist
+  '(("mp3" . "mpg123") ("ogg" . "ogg123")))
+;;    (list "mp3"
+;; 	 (list "mpg123")
+;; 	 mpg123-mpg123-time-regexp
+;; 	 mpg123-mpg123-init-frame-regexp
+;; 	 mpg123-mpg123-frame-regexp
+;; 	 'mpg123:time2frame
+;; 	 'string-to-number
+;; 	 'mpg123:peek-id3-tag)
+;;    (list "ogg"
+;; 	 (list "ogg123") ;; "-d" "oss"
+;; 	 mpg123-ogg123-time-regexp
+;; 	 mpg123-ogg123-init-frame-regexp
+;; 	 mpg123-ogg123-frame-regexp
+;; 	 'mpg123:time2second
+;; 	 'mpg123:time2second-num
+;; 	 'mpg123*ogg123-peek-tag)))
+
+(defun mpg123:file-name-extension (name)
+  (let ((md (match-data)))
+    (prog1
+	(if (string-match "\\.\\([^.]+\\)$" name)
+	    (substring name (match-beginning 1) (match-end 1))
+	  "mp3")		;; defaults to "mp3"
+      (store-match-data md))))
+
+(defun mpg123:get-sound-type (name)
+  (cdr (assoc (mpg123:file-name-extension name) mpg123-type-alist)))
+
+(defun mpg123:get-from-file-about (file what)
+  (let* ((case-fold-search t)
+	 (type (mpg123:get-sound-type file))
+	 (var (format "mpg123-%s-%s" type what)))
+    (and type
+	 (intern-soft var)
+	 (symbol-value (intern var)))))
+
+(defun mpg123:get-command-name (file)
+  (mpg123:get-from-file-about file "command"))
+
+(defun mpg123:get-command-args (file)
+  (mpg123:get-from-file-about file "command-args"))
+
+(defun mpg123:time-regexp (file)
+  "Return time-regexp corresponding to FILE"
+  (or (mpg123:get-from-file-about file "time-regexp")
+      "CANTBEHERE"))
+
+(defun mpg123:init-frame-regexp (file)
+  (or (mpg123:get-from-file-about file "init-frame-regexp")
+      "CANTBEHERE"))
+(defun mpg123:frame-regexp (file)
+  (or (mpg123:get-from-file-about file "frame-regexp")
+      "CANTBEHERE"))
+
+(defun mpg123:convert-frame-function (filename)
+  (let*((type (mpg123:get-sound-type filename))
+	(fname (format "mpg123-%s-convert-frame" type)))
+    (if (and (intern-soft fname)
+	     (fboundp (intern fname)))
+	(intern fname)
+      'concat)))
+
+(defun mpg123-mpg123-convert-frame (time filename)
+  "Return frame itself"
+  (string-to-int time))
+(defun mpg123-ogg123-convert-frame (time filename)
+  "Return (mpg123:time2frame TIME FILENAME)"
+  (string-to-int (mpg123:time2frame time filename)))
+  
+(defun mpg123:peek-tag (file)
+  "Should be REWRITEN!!!!"
+  (let ((type (mpg123:get-sound-type file)))
+    (cond
+     ((string-equal type "mpg123") (mpg123:peek-id3-tag file))
+     ((string-equal type "ogg123") (mpg123:ogg123-peek-tag file))
+     (t "Unknown File"))))
 
 (defun mpg123:mp3-skip-id3v2 ()
   "Skip ID3v2 tag in current buffer."
@@ -669,34 +766,39 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 (スペースキーでオサラバ)
 ***********************************************************" (point)))
   
+(defvar mpg123:time-regexp nil)
+(defvar mpg123:frame-regexp nil)
+(defvar mpg123*convert-frame-function nil)
 
 (defun mpg123:initial-filter (proc mess)
   "mpg123 process filter No.1, called at startup of mpg123."
-  (if (string-match "Can't open /dev" mess)
-      (progn
-	(set-process-filter proc nil)
-	(mpg123:open-error)
-	(error "bye")))
-  (if (string-match "Frame# *[0-9]+ *\\[\\([ 0-9]+\\]\\)" mess)
-      (let ((f (substring mess (match-beginning 1) (match-end 1))))
-	(mpg123:set-music-info
-	 mpg123*cur-music-number 'frames
-	 (setq mpg123*cur-total-frame (string-to-number f)))))
-  (if (string-match "Time: \\(..:..\\)... +\\[\\(..:..\\)" mess)
-      (let ((cur (substring mess (match-beginning 1) (match-end 1)))
-	    (max (substring mess (match-beginning 2) (match-end 2))))
-	(mpg123:update-playtime cur)
-	(mpg123:set-music-info
-	 mpg123*cur-music-number 'length max)
-	(if (not (string-equal "00:00" max))
-	    (mpg123:update-length max))
-    ))
-  ;(save-excursion
-  ;  (set-buffer mpg123*info-buffer)
-  ;  (insert mess))
-  (and (mpg123:get-music-info mpg123*cur-music-number 'length)
-       (mpg123:get-music-info mpg123*cur-music-number 'frames)
-       (set-process-filter proc 'mpg123:filter)))
+  (let ((targetfile mpg123*cur-music-file))
+    (if (string-match "Can't open /dev" mess)
+	(progn
+	  (set-process-filter proc nil)
+	  (mpg123:open-error)
+	  (error "bye")))
+    (if (string-match mpg123:init-frame-regexp mess)
+	(let ((f (substring mess (match-beginning 1) (match-end 1))))
+	  (mpg123:set-music-info
+	   mpg123*cur-music-number 'frames
+	   (setq mpg123*cur-total-frame
+		 (funcall mpg123*convert-frame-function f targetfile)))))
+    (if (string-match mpg123:time-regexp mess)
+	(let ((cur (substring mess (match-beginning 1) (match-end 1)))
+	      (max (substring mess (match-beginning 2) (match-end 2))))
+	  (mpg123:update-playtime cur)
+	  (mpg123:set-music-info
+	   mpg123*cur-music-number 'length max)
+	  (if (not (string-equal "00:00" max))
+	      (mpg123:update-length max))
+	  ))
+					;  (save-excursion
+				    ;    (set-buffer mpg123*info-buffer)
+					;    (insert mess))
+    (and (mpg123:get-music-info mpg123*cur-music-number 'length)
+	 (mpg123:get-music-info mpg123*cur-music-number 'frames)
+	 (set-process-filter proc 'mpg123:filter))))
 
 (defvar mpg123*window-width nil)
 (defvar mpg123*cur-total-frame nil)
@@ -715,20 +817,25 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
       (save-excursion
 	;;(set-buffer mpg123*info-buffer)  ;heavy
 	;;(insert mess)                    ;jobs
-	(if (string-match "Time: \\(..:..\\)" mess)
+	(if (string-match mpg123:time-regexp mess)
 	    (let ((s (substring mess (match-beginning 1) (match-end 1))))
 	      (and (not (string= s mpg123*cur-playtime))
 		   (not mpg123*time-setting-mode)
 		   (mpg123:update-playtime (setq mpg123*cur-playtime s)))))
-	(if (string-match "Frame# +\\([0-9]+\\)" mess)
+(setq foo mess)
+	(if (string-match mpg123:frame-regexp mess)
 	    (let (c)
 	      (setq mpg123*cur-playframe
-		    (substring mess  (match-beginning 1) (match-end 1)))
+		    (funcall mpg123*convert-frame-function
+			     (substring mess
+					(match-beginning 1)
+					(match-end 1))
+			     mpg123*cur-music-file))
 	      (mpg123:slider-check))))))
 
 (defsubst mpg123:slider-check-1 ()
   (let ((c (/ (* mpg123*window-width
-		 (string-to-int mpg123*cur-playframe))
+		 mpg123*cur-playframe)
 	      mpg123*cur-total-frame))
 	left)
     (or (eq c mpg123*cur-slider-column)
@@ -785,8 +892,12 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		  (mpg123:play))
 	      (put 'mpg123:sentinel 'current-buffer nil))))))))
 
-(defun mpg123:time2frame (timestr)
+(defvar mpg123*time2frame-ratio-alist
+  '(("mpg123" 1000 . 26) ("ogg123" 1 . 1)))
+
+(defun mpg123:time2frame (timestr &optional filename)
   "Convert time string (mm:ss) to frame number.(0.026s/f)"
+  (setq filename (or filename mpg123*cur-music-file))
   (string-match "\\(..\\):\\(..\\)" timestr)
   (let*((m (string-to-number
 	    (substring timestr (match-beginning 1) (match-end 1))))
@@ -795,7 +906,10 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(total (+ (* m 60) s))
 	(frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
 	(length (mpg123:get-music-info mpg123*cur-music-number 'length))
-	(ratio-f 1000) (ratio-s 26))
+	(type (mpg123:get-sound-type filename))
+	(alist mpg123*time2frame-ratio-alist)
+	(ratio-f (car (cdr (assoc type alist))))
+	(ratio-s (cdr (cdr (assoc type alist)))))
     (if (and frames length)
 	;;if total frames and length(in time) is available,
 	;;use them to calculate target frame number
@@ -883,6 +997,14 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 
       (skip-chars-forward "^ ")
       (skip-chars-forward " ")
+      (setq music (mpg123:get-music-info mpg123*cur-music-number 'filename)
+	    mpg123*cur-music-file music)
+      (if (fboundp 'code-convert-string)
+	  (setq music (code-convert-string
+		       music mpg123-process-coding-system *internal*)))
+      (and (eq mpg123-system-type 'nt)		;convert to dos filename for
+	   (fboundp 'unix-to-dos-file-name)	;music over shared folder(Win)
+	   (setq music (unix-to-dos-file-name music)))
       (cond
        (startframe (setq mpg123*cur-start-frame startframe))
        ((or (looking-at mpg123*default-time-string))
@@ -893,15 +1015,10 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 		     (point)
 		     (progn (skip-chars-forward "^ /")(point)))))
 	  (if (and (string= time mpg123*cur-playtime) mpg123*cur-playframe)
-	      (setq mpg123*cur-start-frame mpg123*cur-playframe)
-	    (setq mpg123*cur-start-frame (mpg123:time2frame time))))))
-      (setq music (mpg123:get-music-info mpg123*cur-music-number 'filename))
-      (if (fboundp 'code-convert-string)
-	  (setq music (code-convert-string
-		       music mpg123-process-coding-system *internal*)))
-      (and (eq mpg123-system-type 'nt)		;convert to dos filename for
-	   (fboundp 'unix-to-dos-file-name)	;music over shared folder(Win)
-	   (setq music (unix-to-dos-file-name music)))
+	      (setq mpg123*cur-start-frame
+		    (int-to-string mpg123*cur-playframe))
+	    (setq mpg123*cur-start-frame
+		  (mpg123:time2frame time music))))))
       (setq mpg123*time-setting-mode nil)
       (if mpg123*use-face
 	  (let ((frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
@@ -930,17 +1047,21 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 			       'face
 			       'mpg123-face-slider))
 	      (fset 'mpg123:slider-check 'mpg123:null))))
+      (setq mpg123:time-regexp (mpg123:time-regexp music)
+	    mpg123:init-frame-regexp (mpg123:init-frame-regexp music)
+	    mpg123:frame-regexp (mpg123:frame-regexp music)
+	    mpg123*convert-frame-function (mpg123:convert-frame-function
+					   music))
       (set-process-filter
        (setq p (apply 'start-process "mpg123"
 		      (current-buffer)
-		      mpg123-command
+		      (mpg123:get-command-name music)
 		      (delq nil
 			    (append
 			     (list
 			      "-v" "-k" mpg123*cur-start-frame)
-			     mpg123-command-args
-			     (list music)
-			     ))))
+			     (mpg123:get-command-args music)
+			     (list music)))))
        (if (and (mpg123:get-music-info mpg123*cur-music-number 'length)
 		(mpg123:get-music-info mpg123*cur-music-number 'frames))
 	   'mpg123:filter
@@ -1002,6 +1123,8 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 		(save-excursion (goto-char mpg123*cur-play-marker) (point))))
 	nil ;if on the current music, do nothing (?)
       (mpg123:sure-kill p)
+      (setq mpg123*time-setting-mode nil
+	    mpg123*interrupt-p nil)
       (mpg123:play start-frame))))
 
 (defun mpg123-mouse-play-stop (ev)
@@ -1044,7 +1167,8 @@ percentage in the length of the song etc.
     (if (null mpg123*cur-music-number) nil
       (mpg123:kill-current-music)
       (setq frames (mpg123:time2frame
-		    (mpg123:get-music-info mpg123*cur-music-number 'length))
+		    (mpg123:get-music-info mpg123*cur-music-number 'length)
+		    (mpg123:get-music-info mpg123*cur-music-number 'filename))
 	    target (/ (* (string-to-int frames) c) w))
       (message "new = %d" target)
       (save-excursion
@@ -1101,7 +1225,8 @@ percentage in the length of the song etc.
 (defun mpg123-mark-position ()
   "Mark the playing position now."
   (interactive)
-  (let ((f (max 0 (- (string-to-int mpg123*cur-playframe) 50))))
+  (let ((f (max 0 (- mpg123*cur-playframe ;more 1.5sec back
+		     (/ (string-to-int (mpg123:time2frame "00:02")) 3)))))
     (mpg123:set-music-info mpg123*cur-music-number 'mark (format "%d" f))
     (mpg123:set-music-info
      mpg123*cur-music-number 'marktime mpg123*cur-playtime)
@@ -1589,7 +1714,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (if (re-search-forward "\\s +$" nil t)
       (replace-match ""))))
 
-(defun mpg123:peek-tag (file)
+(defun mpg123:peek-id3-tag (file)
   "Try peeking id3tag from FILE"
   (let ((sz (nth 7 (file-attributes (file-truename file))))
 	(b (get-buffer-create " *mpg123 tag tmp*"))
@@ -1618,6 +1743,40 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 	(setq file (file-name-nondirectory file))
 	(if (fboundp 'code-convert-string)
 	    (code-convert-string file mpg123-process-coding-system *internal*)
+	  (file-name-nondirectory file))))))
+
+(defun mpg123:ogg123-tag-search (tag-name &optional preservep)
+  (let ((cursorpos (and preservep
+			(point)))
+	(tag-val (and (re-search-forward (concat "^" tag-name  "=\\(.+\\)$") (point-max) t)
+		      (buffer-substring
+		       (match-beginning 1)
+		       (match-end 1)))))
+    (goto-char (or cursorpos
+		   (point)))
+    tag-val))
+
+(defun mpg123:ogg123-peek-tag (file)
+  (let* ((tmp-buffer-name " *mpg123 tag tmp* ")
+	(b (get-buffer-create tmp-buffer-name))
+	title artist)
+    (save-excursion
+      (set-buffer b)
+      (erase-buffer)
+      (call-process "vorbiscomment" nil tmp-buffer-name nil "-l" file)
+      (goto-char (point-min))
+      (let ((title (mpg123:ogg123-tag-search "title" t))
+	    (artist (mpg123:ogg123-tag-search "artist")))
+	(while (setq next-artist (mpg123:ogg123-tag-search "artist"))
+	  (setq artist (concat artist ", "
+			       next-artist)))
+	(kill-buffer (current-buffer))
+	(if title
+	    (concat
+	     title
+	     (if mpg123-omit-id3-artist
+		 ""
+	       (concat " by " artist)))
 	  (file-name-nondirectory file))))))
 
 (defun mpg123:insert-help ()
@@ -1912,8 +2071,17 @@ the music will immediately move to that position.
 ;;;
 (defun mpg123 (file)
   "Call mpg123 on file"
-  (interactive "Fmpg123 on file: ")
-  (let ((dir (file-name-directory file))
+  (interactive "i")
+  (let*((defaultdir (if (file-directory-p mpg123-default-dir)
+			mpg123-default-dir
+		      default-directory))
+	(file (or file
+		  (expand-file-name
+		   (read-file-name "mpg123 on File/Directory: "
+				   defaultdir
+				   defaultdir
+				   t))))
+	(dir (file-name-directory file))
         (files
          (cond ((file-directory-p file)
                 ;; Add all files and playlists in a directory
@@ -1926,19 +2094,30 @@ the music will immediately move to that position.
                 (list file))
                (t
                 (error "Not an mp3 or playlist: %s" file)))))
+    (setq mpg123-default-dir (if (file-directory-p file)
+				 file
+			       (file-name-directory file)))
     (mpg123:create-buffer files)
     (message "Let's listen to the music. Type SPC to start.")
     (setq mpg123*music-in-stack nil)
     (run-hooks 'mpg123-hook)))
 
 (if (and mpg123-process-coding-system (symbolp mpg123-process-coding-system))
-    (let ((coding mpg123-process-coding-system))
+    (let ((coding mpg123-process-coding-system)
+	  (cmdlist (mapcar
+		    '(lambda (a)
+		       (mpg123:get-command-name (concat "dummy." (car a))))
+		    mpg123-type-alist)))
       (cond
        ((fboundp 'modify-coding-system-alist)
 	(modify-coding-system-alist
-	 'process mpg123-command (cons coding coding)))
+	 'process
+	 (concat "^\\(" (mapconcat 'concat cmdlist "\\|") "\\)$")
+	 (cons coding coding)))
        ((fboundp 'define-program-coding-system)
-	(define-program-coding-system nil mpg123-command (cons coding coding)))
+	(while cmdlist
+	(define-program-coding-system nil (car cmdlist) (cons coding coding))
+	(setq cmdlist (cdr cmdlist))))
        (t nil))))
 
 (provide 'mpg123)
