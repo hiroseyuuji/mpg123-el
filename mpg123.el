@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Dec 23 16:39:33 2000 on firestorm
-;;; Update count: 810
+;;; Last modified Fri Jan 19 13:40:41 2001 on buell
+;;; Update count: 811
 
 ;;[Commentary]
 ;;	
@@ -239,6 +239,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.19  2001/01/19 04:41:37  yuuji
+;; Fix the invalid 'cond form.
+;;
 ;; Revision 1.18  2000/12/23 07:41:23  yuuji
 ;; Slider stays wrong position when music list added.  Fixed
 ;;
@@ -339,7 +342,7 @@ mpg123.el初回起動時の音量のデフォルト値.")
 	      (intern-soft "euc-jp"))
 	 'euc-jp)
 	((boundp '*euc-japan*) *euc-japan*)
-	nil)
+	(t nil))
   "*Default process coding system for mpg123.
 mpg123コマンド用の漢字コード。漢字ファイル名があるときは必須")
 (defvar mpg123-omit-id3-artist nil
