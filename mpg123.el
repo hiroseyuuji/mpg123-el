@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sun Aug  6 11:26:47 2000 on firestorm
-;;; Update count: 684
+;;; Last modified Sun Aug  6 12:34:19 2000 on firestorm
+;;; Update count: 695
 
 ;;[Commentary]
 ;;	
@@ -217,6 +217,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.13  2000/08/06 03:56:37  yuuji
+;; Support volume setting on NetBSD(mixerctl)
+;;
 ;; Revision 1.12  2000/08/06 02:27:58  yuuji
 ;; Set it default to use hilighting.
 ;;
@@ -266,13 +269,14 @@ mpg123のコマンド名。0.59qが必要。")
   "*Arguments to give to mpg123")
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
-	     '((freebsd . "mixer") (linux . "aumix")
+	     '((freebsd . "mixer") (netbsd . "mixerctl") (linux . "aumix")
 	       (solaris . "audioctl") (nt . "mixer.exe"))))
   "*Command name for mixer setting utility
 mixer調節用コマンド")
 (defvar mpg123-mixer-setvol-target-list
   (cdr (assq mpg123-system-type
-	     '((freebsd . ("vol" "pcm")) (linux . ("-v"))
+	     '((freebsd . ("vol" "pcm")) (netbsd . ("outputs.master"))
+	       (linux . ("-v"))
 	       (solaris . ("-v")) (nt . ("-v")))))
   "*Option list for volume setting utility.
 mixer調節コマンドの音量調節オプションのリスト")
@@ -1310,6 +1314,7 @@ mpg123:
 \\[mpg123-kill-line]	Kill music line and push onto stack
 \\[mpg123-yank-line]	Yank music line from stack
 \\[mpg123-quit]	Quit
+0..9	Digit argument (ex. 50V increase volume by 50step)
 "
 ))))
 
@@ -1447,6 +1452,22 @@ mpg123:
 		(setq vol (cons (string-to-int left) (string-to-int right))))
 	    (setq vol "unknown"))
 	  (setq mpg123*cur-volume vol)))
+       ((eq mpg123-system-type 'netbsd)
+	(let ((b (get-buffer-create " *mpg123 mixer* "))
+	      vol)
+	  (set-buffer b)
+	  (erase-buffer)
+	  (call-process mpg123-mixer-command
+			nil b nil "-v" (car mpg123-mixer-setvol-target-list))
+	  (goto-char (point-min))
+	  (if (re-search-forward "=*\\([0-9]+\\),\\([0-9]+\\)" nil t)
+	      (let ((left (buffer-substring
+			   (match-beginning 1) (match-end 1)))
+		    (right (buffer-substring
+			    (match-beginning 2) (match-end 2))))
+		(setq vol (cons (string-to-int left) (string-to-int right))))
+	    (setq vol "unknown"))
+	  (setq mpg123*cur-volume vol)))
        ((eq mpg123-system-type 'linux)
 	(let ((b (get-buffer-create " *mpg123 mixer* "))
 	      vol)
@@ -1468,33 +1489,39 @@ mpg123:
 (defun mpg123:set-volume (vollist)
   "Set volume"
   (if (integerp vollist) (setq vollist (cons vollist vollist)))
-  (if mpg123-mixer-command
-      (cond
-       ((memq mpg123-system-type '(freebsd linux solaris nt))
-	(let ((l mpg123-mixer-setvol-target-list)
-	      (v (format "%d:%d" (car vollist) (cdr vollist)))
-	      args)
-	  (setq mpg123*cur-volume vollist)
-	  (while l
-	    (setq args (cons (car l) (cons v args)))
-	    (setq l (cdr l)))
-	  (apply 'call-process
-		 mpg123-mixer-command nil nil nil
-		 args))))))
+  (if (and mpg123-mixer-command
+	   (memq mpg123-system-type '(freebsd netbsd linux solaris nt)))
+      (let*((l mpg123-mixer-setvol-target-list)
+	    (ctl-type (string-match "mixerctl" mpg123-mixer-command))
+	    (v (format "%d%c%d"
+		       (car vollist) (if ctl-type ?, ?:) (cdr vollist)))
+	    args)
+	(setq mpg123*cur-volume vollist)
+	(while l
+	  (setq args
+		(if ctl-type
+		    (cons (format "%s=%s" (car l) v) args)
+		  (cons (car l) (cons v args))))
+	  (setq l (cdr l)))
+	(if ctl-type (setq args (cons "-w" args)))
+	(apply 'call-process
+	       mpg123-mixer-command nil nil nil
+	       args))))
 
 (defun mpg123-volume-increase (arg)
   "Increase both(left/right) volume by ARG count."
   (interactive "p")
-  (cond
-   ((consp mpg123*cur-volume)
-    (let ((left (car mpg123*cur-volume)) (right (cdr mpg123*cur-volume)))
-      (setq left (max 0 (min 100 (+ arg left)))
-	    right (max 0 (min 100 (+ arg right))))
-      (mpg123:set-volume (cons left right))))
-   ((integerp mpg123*cur-volume)
-    (let ((v (max 0 (min (+ mpg123*cur-volume arg)))))
-      (mpg123:set-volume (cons v v)))))
-  (mpg123:update-volume mpg123*cur-volume))
+  (let ((maxvol (if (string-match "mixerctl" mpg123-mixer-command) 255 100)))
+    (cond
+     ((consp mpg123*cur-volume)
+      (let ((left (car mpg123*cur-volume)) (right (cdr mpg123*cur-volume)))
+	(setq left (max 0 (min maxvol (+ arg left)))
+	      right (max 0 (min maxvol (+ arg right))))
+	(mpg123:set-volume (cons left right))))
+     ((integerp mpg123*cur-volume)
+      (let ((v (max 0 (min (+ mpg123*cur-volume arg)))))
+	(mpg123:set-volume (cons v v)))))
+    (mpg123:update-volume mpg123*cur-volume)))
 
 (defun mpg123-volume-decrease (arg)
   "Decrease both(left/right) volume by ARG count."
