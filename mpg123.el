@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sun Aug  6 12:34:19 2000 on firestorm
-;;; Update count: 695
+;;; Last modified Mon Oct 16 17:52:20 2000 on firestorm
+;;; Update count: 696
 
 ;;[Commentary]
 ;;	
@@ -217,6 +217,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.14  2000/10/16 08:52:44  yuuji
+;; 'mpg123*cur-face renamed to 'mpg123-cur-face (For XEmacs)
+;;
 ;; Revision 1.13  2000/08/06 03:56:37  yuuji
 ;; Support volume setting on NetBSD(mixerctl)
 ;;
@@ -677,12 +680,12 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   "Overlay to indicate playing positino")
 (if (and (fboundp 'make-face) mpg123*use-face)
     (progn
-      (make-face 'mpg123*cur-face)
+      (make-face 'mpg123-cur-face)
       (if (and window-system (x-display-color-p))
 	  (progn
-	    (set-face-background 'mpg123*cur-face "#008080")
-	    (set-face-foreground 'mpg123*cur-face "yellow"))
-	(set-face-underline-p 'mpg123*cur-face t)))
+	    (set-face-background 'mpg123-cur-face "#008080")
+	    (set-face-foreground 'mpg123-cur-face "yellow"))
+	(set-face-underline-p 'mpg123-cur-face t)))
   (setq mpg123*use-face nil))
 
 (defun mpg123:play (&optional startframe)
@@ -731,7 +734,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 			      (save-excursion (beginning-of-line) (point))
 			      (save-excursion (end-of-line) (point))))
 		       'face
-		       'mpg123*cur-face))
+		       'mpg123-cur-face))
       (set-process-filter
        (setq p (apply 'start-process "mpg123"
 		      (current-buffer)
