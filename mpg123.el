@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon Jul  5 17:57:52 1999 on vfr
-;;; Update count: 462
+;;; Last modified Thu Jul 15 13:28:22 1999 on firestorm
+;;; Update count: 468
 
 ;;[Commentary]
 ;;	
@@ -58,10 +58,10 @@
 ;;		M-x mpg123 ぺし
 ;;		ディレクトリ名 ぺし
 ;;	
-;;	と打つ。と、そのディレクトリにある音楽ファイル一覧が出て来るので、
-;;	聞きたい曲に合わせてSPCを打つと演奏が始まります。その他のキーコ
-;;	マンドは音楽一覧バッファの末尾に表示されているのでそっちを見てく
-;;	ださい。
+;;	と打ちます。と、そのディレクトリにある音楽ファイル一覧が出て来る
+;;	ので、聞きたい曲に合わせてSPCを打つと演奏が始まります。その他の
+;;	キーコマンドは音楽一覧バッファの末尾に表示されているのでそっちを
+;;	見てください。
 ;;	
 ;;	
 ;;[Configuration]
@@ -100,13 +100,13 @@
 ;;	obtained from http://www.gentei.org/~yuuji/software/.
 ;;	
 ;;	Emacs使ってるんだから聞くばっかりじゃなくて編集しなさい!  てこと
-;;	で、全画面を消費するmpg123.elを素のEmacsで使ってたら大変。ためし
-;;	に windows.el と一緒につこてみてね。フレームを使ってるときは別フ
-;;	レームでバックグラウンド再生、-nw で起動しているときは裏ウィンド
-;;	ウでバックグラウンド再生できて、その裏ウィンドウといくつかの編集
-;;	ウィンドウを切替えて使うなんて事も可能。もちろんこの文章も裏で
-;;	mpg123を走らせながら書いてます。windows.el は
-;;	http://www.gentei.org/~yuuji/software/ からどうぞ。
+;;	で、全フレームを消費するmpg123.elを素のEmacsで使ってたら大変。た
+;;	めしに windows.el と一緒につこてみてね。フレームを使ってるときは
+;;	別フレームでバックグラウンド再生、-nw で起動しているときは裏ウィ
+;;	ンドウでバックグラウンド再生できて、その裏ウィンドウといくつかの
+;;	編集ウィンドウを切替えて使うなんて事も可能。もちろんこの文章も裏
+;;	に半分隠れてるフレームでmpg123を走らせながら書いてます。
+;;	windows.el は http://www.gentei.org/~yuuji/software/ からどうぞ。
 ;;	
 ;;[Bugs]
 ;;	
@@ -143,6 +143,9 @@
 ;;							yuuji@gentei.org
 ;;[History]
 ;; $Log$
+;; Revision 1.5  1999/07/24 03:58:52  yuuji
+;; mule2でなるべく曲連係が途切れないように工夫(完璧ではない)。
+;;
 ;; Revision 1.4  1999/07/05 09:00:19  yuuji
 ;; 日本語ファイル名対応(たぶん)
 ;; \C-d (mpg123-delete-file)
@@ -219,6 +222,10 @@ mpg123コマンド用の漢字コード。漢字ファイル名があるときは必須")
     (progn
       (define-key mpg123-mode-map [down-mouse-1] 'mpg123-mouse-play-stop)
       ))
+(let ((ch ?0))
+  (while (<= ch ?9)
+    (define-key mpg123-mode-map (char-to-string ch) 'digit-argument)
+    (setq ch (1+ ch))))
 
 ;;;
 ;; Internal Work
@@ -435,11 +442,11 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
             (set-buffer mpg123*buffer)
             (goto-char mpg123*cur-play-marker)
             (mpg123-next-line 1)
-	    (setq p (point))
 	    (sit-for 0)
             (if (and (not (mpg123:in-music-list-p))
                      (mpg123:repeat-check)) ;decrement counter and check
                 (goto-char (point-min)))
+	    (setq p (point))
 	    (if (and (string-match "^19\\." emacs-version)
 		     (setq mp3w (get-buffer-window mpg123*buffer t)))
 		;; For the sake of Emacs 19, we have to switch to
