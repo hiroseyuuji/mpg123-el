@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Thu Sep 19 01:36:24 2002 on firestorm
-;;; Update count: 1002
+;;; Last modified Sat Sep 21 21:55:01 2002 on firestorm
+;;; Update count: 1009
 
 ;;[News]
 ;;	Support OggVorbis (thanks to Andreas Fuchs <asf@acm.org>)
@@ -143,9 +143,9 @@
 ;;	  mpg123-need-slider	t on color display, else nil
 ;;				Whether the playing position slider is
 ;;				needed or not
+;;	  mpg123-auto-redraw	Redraw slider when resize window
 ;;	
-;;	ほぼ mpg123 0.59q に決め打ちという風情なので、あまりいじれるとこ
-;;	ろ無いけど、上に書いてある変数がいじれます。
+;;	あまりいじれるところ無いけど、上に書いてある変数がいじれます。
 ;;	
 ;;	なおLinuxでは音量調節コマンドとして aumix -w の利用を前提とします。
 ;;	このプログラムで音量をいじりたいときは aumix をインストールしてお
@@ -279,16 +279,24 @@
 ;;		Sent information on OpenBSD.
 ;;	Toni Ronkko <tronkko@hytti.uku.fi>
 ;;		Many suggestions.
+;;	SHIMADA Mitsunobu <simm@mbox.fan.gr.jp>
+;;		Sent a patch of mpg123-auto-redraw and truncate-lines.
 ;;	N. SHIMIZU <CZA06074@nifty.com>
 ;;		Sent a patch to restore cursor position after id3-edit.
 ;;	HIROSE Yoshihide <yoshihide@fast.co.jp>
 ;;		Report and sent a patch for IRIX6.
 ;;	Andreas Fuchs <asf@acm.org>
 ;;		Support OggVorbis.
+;;	Akinori MUSHA <knu@iDaemons.org>
+;;		Sent a patch to read oggcomment correctly
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.30  2002/09/21 12:56:27  yuuji
+;; Picking ogg's comment starts from file offset 84.
+;; Fixed by Akinori MUSHA <knu@iDaemons.org>.
+;;
 ;; Revision 1.29  2002/09/18 17:22:05  yuuji
 ;; Peek ogg's comment directly.
 ;; Revise document.
@@ -390,7 +398,7 @@
    ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet tested
    ((string-match "linux" (emacs-version))	'linux)
    ((string-match "irix" (emacs-version))	'irix)
-   ((string-match "nt4\\|windows9" (emacs-version)) 'nt)
+   ((string-match "nt[45]\\|windows9" (emacs-version)) 'nt)
    ((string-match "solaris" (emacs-version))	'solaris)))
 
 (defvar mpg123-mpg123-command "mpg123"
@@ -455,6 +463,9 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 
 (defvar mpg123-show-help t
   "*Print help summary in mpg123 buffer")
+
+(defvar mpg123-auto-redraw nil
+  "*Redraw automatically when changed window size")
 
 (defvar mpg123-mode-map nil)
 (setq mpg123-mode-map (make-keymap))
@@ -871,6 +882,9 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	 (mpg123:get-music-info mpg123*cur-music-number 'frames)
 	 (set-process-filter proc 'mpg123:filter))))
 
+(defsubst mpg123:window-width ()
+  (if mpg123-auto-redraw (window-width) mpg123*window-width))
+
 ;; (defun mpg123:move-slider (column)
 ;;   "Move slider to COLUMN"
 ;;   (let ((left (overlay-start mpg123*indicator-overlay)))
@@ -897,10 +911,13 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 					(match-beginning 1)
 					(match-end 1))
 			     mpg123*cur-music-file))
+	      (and mpg123-auto-redraw
+		   (/= (window-width) mpg123*window-width)
+		   (mpg123:draw-slider-help nil))
 	      (mpg123:slider-check))))))
 
 (defsubst mpg123:slider-check-1 ()
-  (let ((c (/ (* mpg123*window-width
+  (let ((c (/ (* (mpg123:window-width)
 		 mpg123*cur-playframe)
 	      mpg123*cur-total-frame))
 	left)
@@ -956,7 +973,9 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		      (switch-to-buffer cb))
 		  ;; Emacs20 or later, simply play it.
 		  (mpg123:play))
-	      (put 'mpg123:sentinel 'current-buffer nil))))))))
+	      (put 'mpg123:sentinel 'current-buffer nil))))))
+   ((string-match "^hangup" state)
+    (setq mpg123*interrupt-p nil))))
 
 (defvar mpg123*time2frame-ratio-alist
   '(("mpg123" 1000 . 26) ("ogg123" 1 . 1)))
@@ -1044,7 +1063,8 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
       (set-marker mpg123*cur-play-marker nil))
   (if mpg123*use-face
       (progn
-	(setq mpg123*window-width (window-width))
+	(if mpg123-auto-redraw
+	    (setq mpg123*window-width (window-width)))
 	(and mpg123*cur-overlay (delete-overlay mpg123*cur-overlay))
 	(and mpg123*slider-overlay
 	     (delete-overlay mpg123*slider-overlay))))
@@ -1091,7 +1111,7 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	    (if (overlayp mpg123*indicator-overlay)
 		(delete-overlay mpg123*indicator-overlay))
 	    (setq mpg123*indicator-overlay
-		  (make-overlay istart (+ (window-width) istart)))
+		  (make-overlay istart (+ (mpg123:window-width) -1 istart)))
 	    (overlay-put (setq mpg123*cur-overlay
 			       (make-overlay
 				(save-excursion (beginning-of-line) (point))
@@ -1105,7 +1125,7 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 		      (setq istart
 			    (+ istart
 			       (/ (* (string-to-int mpg123*cur-start-frame)
-				     mpg123*window-width)
+				     (mpg123:window-width))
 				  frames))))
 		  (overlay-put (setq mpg123*slider-overlay
 				     (make-overlay istart (1+ istart)))
@@ -1227,7 +1247,7 @@ percentage in the length of the song etc.
   "Jump to current music's certain position according to current column."
   (let ((p (get-buffer-process (current-buffer)))
 	(c (current-column))
-	(w (window-width))
+	(w (mpg123:window-width))
 	frames target)
     (if (null mpg123*cur-music-number) nil
       (mpg123:kill-current-music)
@@ -1823,18 +1843,20 @@ cf. NetBSD:/usr/share/misc/magic
 
   (let ((tmpbuf (get-buffer-create " *mpg123 tag tmp* "))
 	(case-fold-search t)
-	versionlen num-comments comment-len
-	(ofs 109) (peekbytes 256)	;is 256 enough??
+	blen versionlen num-comments comment-len
+	(ofs 84) (peekbytes 256)	;is 256 enough??
 	(basename (file-name-nondirectory file))
 	pt commenthead title artist)
     (save-excursion
       (set-buffer tmpbuf)
       (erase-buffer)
       (mpg123:insert-raw-file-contents file nil ofs (+ ofs peekbytes))
-      (if (= 0 (setq versionlen (mpg123:hex-value 0 4 'little-endian)))
+      (setq blen (mpg123:hex-value 0 1))
+      (setq pt (+ 1 blen 1 6))	;1 is byte width, 6 is length of "vorbis"
+      (if (= 0 (setq versionlen (mpg123:hex-value pt 4 'little-endian)))
 	  ;; if no version header, I don't understand it..., return basename 
 	  basename
-	(setq pt (+ 4 versionlen))	;4 is long-int width
+	(setq pt (+ pt 4 versionlen))	;4 is long-int width
 	(if (<= (setq num-comments (mpg123:hex-value pt 4 'little-endian))
 		0)
 	    ;; if no comments found, return basename
@@ -1934,6 +1956,9 @@ the music will immediately move to that position.
   "Create play-buffer"
   (random t)				;for mpg123-shuffle
   (switch-to-buffer (get-buffer-create mpg123*buffer))
+  (make-local-variable 'truncate-lines)
+  (setq truncate-lines t)
+  (setq mpg123*window-width (window-width))
   (setq buffer-read-only nil)
   (buffer-disable-undo)
   (erase-buffer)
@@ -1955,6 +1980,17 @@ the music will immediately move to that position.
       (insert (mpg123:format-line i))
       (setq i (1+ i)
 	    files (cdr files))))
+  (mpg123:draw-slider-help t))
+
+(defun mpg123:draw-slider-help (&optional initial)
+  "Draw slider and help message"
+  (if (not initial)
+      (progn
+	(set-buffer mpg123*buffer)
+	(setq buffer-read-only nil)
+	(goto-char mpg123*end-of-list-marker)
+	(delete-region (point) (point-max))
+	(setq mpg123*window-width (window-width))))
   (if (markerp mpg123*end-of-list-marker)
       (set-marker mpg123*end-of-list-marker nil))
   (setq mpg123*end-of-list-marker (point-marker))
@@ -1963,11 +1999,18 @@ the music will immediately move to that position.
   (if mpg123-need-slider
       (progn
 	(insert "0%")	;2columns
-	(insert-char ?- (/ (- (window-width) 9) 2))
+	;; (insert-char ?- (/ (- (window-width) 9) 2))
+	(insert-char ?- (/ (- mpg123*window-width 9) 2))
 	(insert "50%")	;3columns
-	(insert-char ?- (- (window-width) (current-column) 5))
+	;; (insert-char ?- (- (window-width) (current-column) 5))
+	(insert-char ?- (- mpg123*window-width (current-column) 5))
 	(insert "100%"))	;4columns
-    (insert-char ?- (1- (window-width))))
+    ;; (insert-char ?- (1- (window-width))))
+    (insert-char ?- (1- mpg123*window-width)))
+  (if (not initial)
+      (let ((istart mpg123*end-of-list-marker))
+	(setq mpg123*indicator-overlay
+	      (make-overlay istart (+ mpg123*window-width -1 istart)))))
   (insert "\nVolume: [")
   (if (markerp mpg123*volume-marker)
       (set-marker mpg123*volume-marker nil))
