@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Jun 25 17:56:29 1999 on firestorm
-;;; Update count: 352
+;;; Last modified Mon Jul  5 17:57:52 1999 on vfr
+;;; Update count: 462
 
 ;;[Commentary]
 ;;	
@@ -59,8 +59,9 @@
 ;;		ディレクトリ名 ぺし
 ;;	
 ;;	と打つ。と、そのディレクトリにある音楽ファイル一覧が出て来るので、
-;;	聞きたい曲に合わせてSPCを打つと演奏が始まる。その他のキーコマン
-;;	ドは音楽一覧バッファの末尾に表示されているのでそっちを見るべし。
+;;	聞きたい曲に合わせてSPCを打つと演奏が始まります。その他のキーコ
+;;	マンドは音楽一覧バッファの末尾に表示されているのでそっちを見てく
+;;	ださい。
 ;;	
 ;;	
 ;;[Configuration]
@@ -100,10 +101,10 @@
 ;;	
 ;;	Emacs使ってるんだから聞くばっかりじゃなくて編集しなさい!  てこと
 ;;	で、全画面を消費するmpg123.elを素のEmacsで使ってたら大変。ためし
-;;	に windows.el と一緒につこてみてくれ。フレームを使ってるときは別
-;;	フレームでバックグラウンド再生、-nw で起動しているときは裏ウィン
-;;	ドウでバックグラウンド再生できて、その裏ウィンドウといくつかの編
-;;	集ウィンドウを切替えて使うなんて事も可能。もちろんこの文章も裏で
+;;	に windows.el と一緒につこてみてね。フレームを使ってるときは別フ
+;;	レームでバックグラウンド再生、-nw で起動しているときは裏ウィンド
+;;	ウでバックグラウンド再生できて、その裏ウィンドウといくつかの編集
+;;	ウィンドウを切替えて使うなんて事も可能。もちろんこの文章も裏で
 ;;	mpg123を走らせながら書いてます。windows.el は
 ;;	http://www.gentei.org/~yuuji/software/ からどうぞ。
 ;;	
@@ -116,7 +117,12 @@
 ;;	
 ;;	たまにmpg123が動いてはいるものの音を出さなくなってしまうことがあ
 ;;	ります。そのような挙動をmpg123.elは検出できないので、そうなった
-;;	らSPCで一旦止めて動かし直してください。
+;;	らSPCで一旦止めて動かし直してください。Emacs19ベースのMuleでは複
+;;	雑な理由により別フレームで演奏中に次の曲に進むと、次の曲に移った
+;;	直後のキーを演奏用バッファに取られてしまい、なおかつ演奏時間の更
+;;	新が(みかけ上)次にキー入力するまで止まってしまいます。そうなって
+;;	しまう確率が下がるような工夫はしてみましたが根本的解決には至りま
+;;	せんでした。
 ;;	
 ;;[No Warranty]
 ;;	
@@ -135,6 +141,12 @@
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
 ;;	下のアドレスまでお願いします(1999/6現在)。
 ;;							yuuji@gentei.org
+;;[History]
+;; $Log$
+;; Revision 1.4  1999/07/05 09:00:19  yuuji
+;; 日本語ファイル名対応(たぶん)
+;; \C-d (mpg123-delete-file)
+;;
 
 (defvar mpg123-system-type
   (cond
@@ -167,6 +179,14 @@ mpg123.el初回起動時の音量のデフォルト値.")
 (defvar mpg123-default-repeat 0
   "*Default number of repetition of through playing.
 再生のデフォルトのリピート回数")
+(defvar mpg123-process-coding-system
+  (cond ((and (fboundp 'modify-coding-system-alist)
+	      (intern-soft "euc-jp"))
+	 'euc-jp)
+	((boundp '*euc-japan*) *euc-japan*)
+	nil)
+  "*Default process coding system for mpg123.
+mpg123コマンド用の漢字コード。漢字ファイル名があるときは必須")
 
 (defvar mpg123-mode-map nil)
 (setq mpg123-mode-map (make-keymap))
@@ -181,6 +201,8 @@ mpg123.el初回起動時の音量のデフォルト値.")
 (define-key mpg123-mode-map "w" 'mpg123-where-is-mark)
 (define-key mpg123-mode-map "-" 'mpg123-volume-decrease)
 (define-key mpg123-mode-map "+" 'mpg123-volume-increase)
+(define-key mpg123-mode-map "v" 'mpg123-volume-decrease)
+(define-key mpg123-mode-map "V" 'mpg123-volume-increase)
 (define-key mpg123-mode-map "f" 'mpg123-forward)
 (define-key mpg123-mode-map "b" 'mpg123-backward)
 (define-key mpg123-mode-map "F" 'mpg123-forward-10)
@@ -191,7 +213,12 @@ mpg123.el初回起動時の音量のデフォルト値.")
 (define-key mpg123-mode-map "k" 'mpg123-kill-line)
 (define-key mpg123-mode-map "y" 'mpg123-yank-line)
 (define-key mpg123-mode-map "s" 'mpg123-shuffle)
+(define-key mpg123-mode-map "\C-d" 'mpg123-delete-file)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
+(if (and window-system)
+    (progn
+      (define-key mpg123-mode-map [down-mouse-1] 'mpg123-mouse-play-stop)
+      ))
 
 ;;;
 ;; Internal Work
@@ -216,7 +243,7 @@ mpg123.el初回起動時の音量のデフォルト値.")
 
 (defun mpg123:sound-p (f)
   "Check the file F is MPEG 1 Audio file or not."
-  (and (> (nth 7 (file-attributes f)) 128) ;check file size > 128
+  (and (> (nth 7 (file-attributes (file-truename f))) 128) ;check file size > 128
        (let ((b (get-buffer-create " *mpg123tmp*"))
 	     (file-coding-system-alist (list (cons "." 'no-conversion))) ;20
 	     (file-coding-system-for-read)) ;19
@@ -256,7 +283,7 @@ mpg123.el初回起動時の音量のデフォルト値.")
 ;     (delete-char 5)
 ;     (insert timestr)))
 (defmacro mpg123:update-playtime (timestr)
-  (list 'progn  ;; 'save-excursion  ??
+  (list 'save-excursion
 	(list 'set-buffer (list 'marker-buffer 'mpg123*cur-play-marker))
 	;(list 'set-buffer 'mpg123*buffer)
 	(list 'let (list 'buffer-read-only)
@@ -321,6 +348,11 @@ mpg123.el初回起動時の音量のデフォルト値.")
 (defmacro mpg123:get-music-info (n attr)
   (list 'cdr (list 'assq attr (list 'assoc n 'mpg123*music-alist))))
 
+(defun mpg123:delete-music-from-list (n)
+  "Delete music number N from mpg123*music-alist."
+  (setq mpg123*music-alist
+	(delq (assq n mpg123*music-alist) mpg123*music-alist)))
+
 (defun mpg123:open-error ()
   (momentary-string-display "
 ***********************************************************
@@ -366,6 +398,9 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(if (not (string-equal "00:00" max))
 	    (mpg123:update-length max))
     ))
+  ;(save-excursion
+  ;  (set-buffer mpg123*info-buffer)
+  ;  (insert mess))
   (and (mpg123:get-music-info mpg123*cur-music-number 'length)
        (set-process-filter proc 'mpg123:filter)))
 
@@ -388,21 +423,41 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (cond
    ((string-match "^finished" state)
     (if mpg123*interrupt-p
-	(progn
-	  (setq mpg123*interrupt-p nil)
-	  )
+        (progn
+          (setq mpg123*interrupt-p nil)
+          )
       (setq mpg123*time-setting-mode nil)
       (mpg123:update-playtime "--:--")
       (if (eq (get-buffer mpg123*buffer)
-	      (marker-buffer mpg123*cur-play-marker))
-	  (progn
-	    (set-buffer mpg123*buffer)
-	    (goto-char mpg123*cur-play-marker)
-	    (mpg123-next-line 1)
-	    (if (and (not (mpg123:in-music-list-p))
-		     (mpg123:repeat-check)) ;decrement counter and check
-		(goto-char (point-min)))
-	    (mpg123:play)))))))
+              (marker-buffer mpg123*cur-play-marker))
+          (let ((cb (current-buffer)) (sw (selected-window))
+		(sf (selected-frame)) mp3w p)
+            (set-buffer mpg123*buffer)
+            (goto-char mpg123*cur-play-marker)
+            (mpg123-next-line 1)
+	    (setq p (point))
+	    (sit-for 0)
+            (if (and (not (mpg123:in-music-list-p))
+                     (mpg123:repeat-check)) ;decrement counter and check
+                (goto-char (point-min)))
+	    (if (and (string-match "^19\\." emacs-version)
+		     (setq mp3w (get-buffer-window mpg123*buffer t)))
+		;; For the sake of Emacs 19, we have to switch to
+		;; mpg123 buffer explicitly.
+		(progn
+		  (select-frame (window-frame mp3w))
+		  (save-window-excursion
+		    (select-window mp3w)
+		    (switch-to-buffer mpg123*buffer)
+		    (goto-char p)
+		    (message "Next music")
+		    (sit-for (string-to-number "0.1"))
+		    (mpg123:play))
+		  (select-frame sf)
+		  (select-window sw)
+		  (switch-to-buffer cb))
+	      ;; Emacs20 or later, simply play it.
+	      (mpg123:play))))))))
 
 (defun mpg123:time2frame (timestr)
   "Convert time string (mm:ss) to frame number.(0.026s/f)"
@@ -443,11 +498,8 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	  (not (mpg123:in-music-list-p)))
       nil ;;if not on music line, then exit
     (let ((last mpg123*cur-music-number) music p)
-      (setq mpg123*cur-music-number
-	    (string-to-int
-	     (buffer-substring
-	      (point)
-	      (progn (skip-chars-forward "0-9") (point)))))
+      (setq mpg123*cur-music-number (mpg123:get-music-number))
+      (skip-chars-forward "^ ")
       (skip-chars-forward " ")
       (cond
        (startframe (setq mpg123*cur-start-frame startframe))
@@ -459,10 +511,13 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(let ((time (buffer-substring
 		     (point)
 		     (progn (skip-chars-forward "^ /")(point)))))
-	  (if (string= time mpg123*cur-playtime)
+	  (if (and (string= time mpg123*cur-playtime) mpg123*cur-playframe)
 	      (setq mpg123*cur-start-frame mpg123*cur-playframe)
 	    (setq mpg123*cur-start-frame (mpg123:time2frame time))))))
       (setq music (mpg123:get-music-info mpg123*cur-music-number 'filename))
+      (if (fboundp 'code-convert-string)
+	  (setq music (code-convert-string
+		       music mpg123-process-coding-system *internal*)))
       (setq mpg123*time-setting-mode nil)
       (set-process-filter
        (setq p (start-process "mpg123"
@@ -480,15 +535,16 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	       (mpg123:get-music-info mpg123*cur-music-number 'name))
       (set-process-sentinel p 'mpg123:sentinel))))
 
-(defun mpg123*sure-kill (p)
+(defun mpg123:sure-kill (p)
   "Waiting process to be killed."
   (let ((retry (if (fboundp 'float) 50 5))) ;retry in seconds
     (while (and p (eq (process-status p) 'run)
 		(>= (setq retry (1- retry)) 0))
       (interrupt-process p)
       (if (fboundp 'float)
-	  (sleep-for (string-to-number "0.1"))
-	(sleep-for 1))
+	  (sit-for (string-to-number "0.1"))
+	(sit-for 1))
+      (if (input-pending-p) (read-char))
       (message "Waiting for process to exit..."))
     (message "")
     (if (and p (eq (process-status p) 'run))
@@ -511,8 +567,17 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	     (= (save-excursion (beginning-of-line) (point))
 		(save-excursion (goto-char mpg123*cur-play-marker) (point))))
 	nil ;if on the current music, do nothing (?)
-      (mpg123*sure-kill p)
+      (mpg123:sure-kill p)
       (mpg123:play start-frame))))
+
+(defun mpg123-mouse-play-stop ()
+  "Play-Stop on current music."
+  (interactive)
+  (set-buffer mpg123*buffer)
+  (if (and mpg123*cur-play-marker (markerp mpg123*cur-play-marker))
+      (goto-char mpg123*cur-play-marker)
+    (goto-char (point-min)))
+  (mpg123-play-stop))
 
 (defun mpg123-play ()
   "PLAY(from the beginning of the music)."
@@ -528,10 +593,12 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
      ((and p (eq (process-status p) 'run))
       (goto-char mpg123*cur-play-marker)
       (if (and (stringp mpg123*cur-playtime)
-	       (string< mpg123*cur-playtime "00:02")) ; is 00:02 readsonable?
-	  (mpg123-prev-line arg))
+	       (string< mpg123*cur-playtime "00:05")) ; is 00:02 readsonable?
+	  (progn
+	    (mpg123:update-playtime "00:00")
+	    (mpg123-prev-line arg)))
       (setq mpg123*interrupt-p t)
-      (mpg123*sure-kill p)
+      (mpg123:sure-kill p)
       (or mpg123-preserve-playtime (mpg123:update-playtime "00:00"))
       (mpg123:play "0")) ;play from frame#0
      ;;else go back to previous line
@@ -548,7 +615,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
       (goto-char mpg123*cur-play-marker)
       (mpg123-next-line arg)
       (setq mpg123*interrupt-p t)
-      (mpg123*sure-kill p)
+      (mpg123:sure-kill p)
       (mpg123:play "0")) ;play from frame#0
      ;;else go to next line
      (t
@@ -561,7 +628,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
     (mpg123:set-music-info mpg123*cur-music-number 'mark (format "%d" f))
     (mpg123:set-music-info
      mpg123*cur-music-number 'marktime mpg123*cur-playtime)
-    (message "Mark the position of [%s].  Push `%s' to refrain"
+    (message "Mark the position of [%s].  Push `%s' to restart here"
 	     mpg123*cur-playtime
 	     (substitute-command-keys "\\[mpg123-refrain]"))))
 
@@ -575,7 +642,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	  (if (and p (eq (process-status p) 'run))
 	      (progn
 		(setq mpg123*interrupt-p t)
-		(mpg123*sure-kill p)))
+		(mpg123:sure-kill p)))
 	  (mpg123:play
 	   (mpg123:get-music-info mpg123*cur-music-number 'mark)))
       (message "No position for refrain marked. Type `%s' to mark position"
@@ -602,7 +669,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   "forw"
   (interactive "p")
   (setq mpg123*time-setting-mode t)
-  (save-excursion
+  (progn ;save-excursion
     (mpg123:goto-playtime-position)
     (looking-at "\\([0-9]+\\):\\([0-9]+\\)/\\([0-9]+\\):\\([0-9]+\\)")
     (let*((m (string-to-int
@@ -642,7 +709,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
       (error "Not directory: %s" dir))
   (let ((p (get-buffer-process (current-buffer))))
     (setq mpg123*interrupt-p t)
-    (if (and p (process-status p)) (mpg123*sure-kill p))
+    (if (and p (process-status p)) (mpg123:sure-kill p))
     (mpg123 dir)))
 
 (defun mpg123-increase-repeat-count (arg)
@@ -805,6 +872,33 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (delete-region (point) mpg123*end-of-list-marker)
     (goto-char p)))
 
+(defun mpg123-delete-file ()
+  "Delete audio file on the point."
+  (interactive)
+  (if (not (mpg123:in-music-list-p))
+    (error "Not on music list"))
+  (let*((n (mpg123:get-music-number)) p
+	(file (mpg123:get-music-info n 'filename)))
+    (cond
+     ((not (y-or-n-p (format "Delete file?(%s): "
+			     (file-name-nondirectory file))))
+      (message "Canceled"))
+     (t
+      (beginning-of-line)
+      (setq p (point))
+      (if (and mpg123*cur-play-marker
+	       (eq (point)
+		   (save-excursion
+		     (goto-char mpg123*cur-play-marker)
+		     (beginning-of-line)
+		     (point))))
+	  (save-excursion (mpg123-> 1)))
+      (let ((buffer-read-only nil))
+	(delete-file file)
+	(delete-region (point)
+		       (progn (forward-line 1) (point)))
+	(mpg123:delete-music-from-list n))))))
+
 (defun mpg123-quit ()
   "Quit"
   (interactive)
@@ -812,7 +906,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (if (and p
 	     (eq (process-status p) 'run)
 	     (y-or-n-p "Kill current music?"))
-	(mpg123*sure-kill p))
+	(mpg123:sure-kill p))
     (setq mpg123*interrupt-p t)
     (mapcar '(lambda (b) (and (get-buffer b) (kill-buffer b)))
 	    (list mpg123*buffer mpg123*info-buffer
@@ -848,7 +942,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 
 (defun mpg123:peek-tag (file)
   "Try peeking id3tag from FILE"
-  (let ((sz (nth 7 (file-attributes file)))
+  (let ((sz (nth 7 (file-attributes (file-truename file))))
 	(b (get-buffer-create " *mpg123 tag tmp*"))
 	title artist)
     (save-excursion
@@ -870,7 +964,10 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 		    " by "
 		    (if (string< "" artist) artist "UnknownArtist")))
 	(kill-buffer b)
-	(file-name-nondirectory file)))))
+	(setq file (file-name-nondirectory file))
+	(if (fboundp 'code-convert-string)
+	    (code-convert-string file mpg123-process-coding-system *internal*)
+	  (file-name-nondirectory file))))))
 
 (defun mpg123:insert-help ()
   "Insert help string to current buffer."
@@ -879,7 +976,7 @@ mpg123:
 \\[mpg123-play-stop]	Play or pause
 \\[mpg123-play]	Play
 \\[mpg123-mark-position]	Mark position (when playing)
-\\[mpg123-refrain]	Refrain from marked position
+\\[mpg123-refrain]	Restart from marked position
 \\[mpg123-where-is-mark]	Where is the marked position
 \\[mpg123-<]	<<
 \\[mpg123->]	>>
@@ -1037,6 +1134,16 @@ mpg123:
     (mpg123:create-buffer files)
     (message "Let's listen to the music. Type SPC to start.")
     (run-hooks 'mpg123-hook)))
+
+(if (and mpg123-process-coding-system (symbolp mpg123-process-coding-system))
+    (let ((coding mpg123-process-coding-system))
+      (cond
+       ((fboundp 'modify-coding-system-alist)
+	(modify-coding-system-alist
+	 'process mpg123-command (cons coding coding)))
+       ((fboundp 'define-program-coding-system)
+	(define-program-coding-system nil mpg123-command (cons coding coding)))
+       (t nil))))
 
 (provide 'mpg123)
 
