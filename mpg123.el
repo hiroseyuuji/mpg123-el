@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2001 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Feb 23 14:38:13 2001 on buell
-;;; Update count: 841
+;;; Last modified Fri Feb 23 15:51:02 2001 on buell
+;;; Update count: 857
 
 ;;[News]
 ;;	Key binding to Delete-file is changed from `C-d' to `D'.
@@ -247,6 +247,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.24  2001/02/23 06:54:30  yuuji
+;; Only `>' obeys repetition count.
+;;
 ;; Revision 1.23  2001/02/23 05:39:26  yuuji
 ;; Delete-file key-binding is changed from `C-d' to `D' for trivial reason..
 ;;
@@ -744,24 +747,27 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
                      (mpg123:repeat-check)) ;decrement counter and check
                 (goto-char (point-min)))
 	    (setq p (point))
-	    (if (and (string-match "^19\\." emacs-version)
-		     (setq mp3w (get-buffer-window mpg123*buffer t)))
-		;; For the sake of Emacs 19, we have to switch to
-		;; mpg123 buffer explicitly.
-		(progn
-		  (select-frame (window-frame mp3w))
-		  (save-window-excursion
-		    (select-window mp3w)
-		    (switch-to-buffer mpg123*buffer)
-		    (goto-char p)
-		    (message "Next music")
-		    (sit-for (string-to-number "0.1"))
-		    (mpg123:play))
-		  (select-frame sf)
-		  (select-window sw)
-		  (switch-to-buffer cb))
-	      ;; Emacs20 or later, simply play it.
-	      (mpg123:play))))))))
+	    (put 'mpg123:sentinel 'current-buffer cb)
+	    (unwind-protect
+		(if (and (string-match "^19\\." emacs-version)
+			 (setq mp3w (get-buffer-window mpg123*buffer t)))
+		    ;; For the sake of Emacs 19, we have to switch to
+		    ;; mpg123 buffer explicitly.
+		    (progn
+		      (select-frame (window-frame mp3w))
+		      (save-window-excursion
+			(select-window mp3w)
+			(switch-to-buffer mpg123*buffer)
+			(goto-char p)
+			(message "Next music")
+			(sit-for (string-to-number "0.1"))
+			(mpg123:play))
+		      (select-frame sf)
+		      (select-window sw)
+		      (switch-to-buffer cb))
+		  ;; Emacs20 or later, simply play it.
+		  (mpg123:play))
+	      (put 'mpg123:sentinel 'current-buffer nil))))))))
 
 (defun mpg123:time2frame (timestr)
   "Convert time string (mm:ss) to frame number.(0.026s/f)"
@@ -831,8 +837,7 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 
 (defvar mpg123-need-slider mpg123*use-face
   "*Need slider in the delimiter line which indicates playing position.
-一覧の下の境界線領域に、現在曲のの再生位置を示すスライダーが要るかどうか。")
-
+一覧の下の境界線領域に、現在曲の再生位置を示すスライダーが要るかどうか。")
 
 (defun mpg123:play (&optional startframe)
   "Play mp3 on current line."
@@ -851,9 +856,6 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	(and mpg123*slider-overlay
 	     (delete-overlay mpg123*slider-overlay))))
   (setq mpg123*cur-play-marker (point-marker))
-  (if (and (>= (point) mpg123*end-of-list-marker)
-	   (mpg123:repeat-check))
-      (goto-char (point-min)))
   (skip-chars-forward " ")
   (if (or (not (looking-at "[0-9]"))
 	  (not (mpg123:in-music-list-p)))
@@ -927,9 +929,15 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 		(mpg123:get-music-info mpg123*cur-music-number 'frames))
 	   'mpg123:filter
 	 'mpg123:initial-filter))
-      (message "%s %s.."
-	       mpg123*cur-music-number
-	       (mpg123:get-music-info mpg123*cur-music-number 'name))
+      (or (let ((b (get 'mpg123:sentinel 'current-buffer)))
+	    ;; If the sentinel is called when the user operates in
+	    ;; minibuffer, suppress message
+	    (if b (or (eq b (window-buffer (minibuffer-window)))
+		      (and (fboundp 'minibuffer-frame-list)
+			   (memq b (minibuffer-frame-list))))))
+	  (message "%s %s.."
+		   mpg123*cur-music-number
+		   (mpg123:get-music-info mpg123*cur-music-number 'name)))
       (set-process-sentinel p 'mpg123:sentinel))))
 
 (defun mpg123:sure-kill (p)
@@ -1066,6 +1074,9 @@ percentage in the length of the song etc.
       (goto-char mpg123*cur-play-marker)
       (mpg123-next-line arg)
       (mpg123:kill-current-music p)
+      (if (and (>= (point) mpg123*end-of-list-marker)
+	       (mpg123:repeat-check))
+	  (goto-char (point-min)))
       (mpg123:play "0")) ;play from frame#0
      ;;else go to next line
      (t
