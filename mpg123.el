@@ -1,17 +1,15 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123/ogg123
-;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2003 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Tue Dec 17 10:15:25 2002 on firestorm
-;;; Update count: 1052
+;;; Last modified Fri Mar 28 23:43:09 2003 on firestorm
+;;; Update count: 1094
 
 ;;[News]
-;;	Multibyte music tag displayed wrong, fixed.
-;;	Changing the width of emacs frame is allowed while playing.
-;;	Variable `mpg123-ogg123-id-coding-system controls coding system
-;;	for vorbiscomment.
-;;	Support OggVorbis (thanks to Andreas Fuchs <asf@acm.org>)
-;;	Rewind key `B' `b' move to previous music if they reache 00:00
+;;	Audio(mp3/ogg) file detection refined for XEmacs.
+;;	Japanese messages.
+;;	New key binding `g' - goto current music line.
+;;	New key binding `W' - show current file name.
 ;;	Variables `mpg123-command' and `mpg123-command-args' are changed
 ;;	to mpg123-mpg123-command and mpg123-mpg123-command-args respectively.
 ;;	
@@ -152,6 +150,7 @@
 ;;				Whether the playing position slider is
 ;;				needed or not
 ;;	  mpg123-auto-redraw	Redraw slider when resize window
+;;	  mpg123-lang		Message language 0=English 1=Japanese
 ;;	
 ;;	あまりいじれるところ無いけど、上に書いてある変数がいじれます。
 ;;	
@@ -304,6 +303,11 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.36  2003/03/28 16:00:58  yuuji
+;; For XEmacs: 'no-conversion changed to 'binary.
+;; `g' mpg123-goto-current-line.
+;; Japanese messages.
+;;
 ;; Revision 1.35  2002/12/17 01:15:50  yuuji
 ;; mpg123:get-sound-type ignores case
 ;;
@@ -448,9 +452,10 @@ ogg123のコマンド名")
   ;;'("-d oss")	;<- example
   "*Arguments to give to ogg123")
 (defvar mpg123-ogg123-id-coding-system
-  (cond ((coding-system-p '*junet*) '*junet*)
-	((coding-system-p 'junet) 'junet)
-	(t nil))
+  (and (fboundp 'coding-system-p)
+       (cond ((coding-system-p '*junet*) '*junet*)
+	     ((coding-system-p 'junet) 'junet)
+	     (t nil)))
   "Preferred coding system of vorbisogg comment tag.
 Vorbiscomment describes that each tag's value can be encoded with utf8.
 However, vorbiscomment disallows 8bit.  So we use iso-20220jp instead.")
@@ -540,6 +545,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "D" 'mpg123-delete-file)
 (define-key mpg123-mode-map "E" 'mpg123-id3-edit)
 (define-key mpg123-mode-map "W" 'mpg123-what-file)
+(define-key mpg123-mode-map "g" 'mpg123-goto-current-line)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
 (define-key mpg123-mode-map "Q" 'mpg123-quit-yes)
 (if (and window-system)
@@ -709,11 +715,12 @@ Optional third argument LITTLE-ENDIAN is self extplanatory."
     (goto-char (1- (point)))))
 
 (defun mpg123:insert-raw-file-contents (&rest args)
-  (let ((file-coding-system-alist (list (cons "." 'no-conversion)))
+  (let ((file-coding-system-alist (list (cons "." 'binary)))
 	(file-coding-system
-	 (if (and (boundp '*noconv*) (coding-system-p '*noconv*))
-	     '*noconv*		;mule19
-	   'no-conversion))	;XEmacs(maybe)
+	 (if (and (fboundp 'coding-system-p)
+		  (boundp '*noconv*) (coding-system-p '*noconv*))
+	     '*noconv*			;mule19
+	   'binary))			;XEmacs(maybe)
 	(file-coding-system-for-read '*noconv*)) ;19
     (apply 'insert-file-contents args)))
   
@@ -786,7 +793,7 @@ If optional argument PATTERN given, search it(tentative)."
   (goto-char mpg123*cur-play-marker)
   (skip-chars-forward "^:")
   (forward-char -2))
-; p(defmacro mpg123:goto-playtime-position ()
+; (defmacro mpg123:goto-playtime-position ()
 ;   (list 'progn
 ; 	(list 'goto-char 'mpg123*cur-play-marker)
 ; 	;(list 'move-to-column 3)
@@ -1357,7 +1364,9 @@ percentage in the length of the song etc.
     (mpg123:set-music-info mpg123*cur-music-number 'mark (format "%d" f))
     (mpg123:set-music-info
      mpg123*cur-music-number 'marktime mpg123*cur-playtime)
-    (message "Mark the position of [%s].  Push `%s' to restart here"
+    (message (mpg123:lang-msg
+	      "Mark the position of [%s].  Push `%s' to restart here"
+	      "[%s] の今の位置を記憶. ここに戻るには `%s' をタイプ.")
 	     mpg123*cur-playtime
 	     (substitute-command-keys "\\[mpg123-refrain]"))))
 
@@ -1370,7 +1379,9 @@ percentage in the length of the song etc.
 	  (mpg123:kill-current-music)
 	  (mpg123:play
 	   (mpg123:get-music-info mpg123*cur-music-number 'mark)))
-      (message "No position for refrain marked. Type `%s' to mark position"
+      (message (mpg123:lang-msg
+		"No position for refrain marked. Type `%s' to mark position"
+		"この曲は位置記録してないす. `%s' をタイプして記録すべし")
 	       (substitute-command-keys "\\[mpg123-mark-position]")))))
 
 (defun mpg123-where-is-mark ()
@@ -1379,9 +1390,14 @@ percentage in the length of the song etc.
   (let ((marktime (mpg123:get-music-info mpg123*cur-music-number 'marktime))
 	(frame (mpg123:get-music-info mpg123*cur-music-number 'mark)))
     (if marktime
-	(message "Mark for music#%d is [%s] (frame#%s)"
+	(message (mpg123:lang-msg
+		  "Mark for music#%d is [%s] (frame#%s)"
+		  "曲番号#%d の記憶位置は [%s] (#%s フレーム)")
 		 mpg123*cur-music-number marktime frame)
-      (message "No mark set for music#%d" mpg123*cur-music-number))))
+      (message (mpg123:lang-msg
+		"No mark set for music#%d"
+		"この曲は位置記録してないのじゃが...")
+	       mpg123*cur-music-number))))
 
 (defun mpg123:add-time (m s add &optional max)
   (let ((x (max 0 (+ (* m 60) s add))))
@@ -1433,8 +1449,14 @@ percentage in the length of the song etc.
 	    (move-to-column c)
 	    (mpg123:update-playtime
 	     (format "%02d:%02d" (car time) (cdr time)) 'here)
-	    (message "Time Slide mode: Type `SPC' to play in that position")))
-      (message "Length not known.  Play this music once please."))))
+	    (message
+	     (mpg123:lang-msg
+	      "Time Slide mode: Type `SPC' to play in that position"
+	      "タイムスライドモード: `SPC' を押してその位置から再生"))))
+      (message
+       (mpg123:lang-msg
+	"Length not known.  Play this music once please."
+	"曲長不明. まずは一回再生してね.")))))
 
 (defun mpg123-backward (arg)
   "Rew"
@@ -1502,12 +1524,13 @@ percentage in the length of the song etc.
        (while (looking-at "\\s *#") (forward-line 1))
        (skip-chars-forward "[ \t]")
        (prog1
-	   (file-exists-p
-	    (expand-file-name
-	     (buffer-substring
-	      (point)
-	      (progn (end-of-line) (skip-chars-backward "[ \t]") (point)))
-	     dir))
+	   (let ((name(buffer-substring
+		       (point)
+		       (progn (end-of-line)
+			      (skip-chars-backward "[ \t]") (point)))))
+	     (and
+	      (file-exists-p (expand-file-name name dir))
+	      (mpg123:get-sound-type name)))
 	 (kill-buffer b))))))
 
 (defun mpg123-add-new (file)
@@ -1675,7 +1698,9 @@ percentage in the length of the song etc.
 From Lisp program, you can specify one of order/Inverse/Random by
 optional argument METHOD.  Set one of ?o or ?i or ?r."
   (interactive)
-  (message "Shuffle music by...(O)rder, (I)nverse order, (R)andom: ")
+  (message (mpg123:lang-msg
+	    "Shuffle music by...(O)rder, (I)nverse order, (R)andom: "
+	    "並べ替え方法: O=>番号順   I=>逆順  R=>ランダム"))
   (let ((c (or method (read-char)))
 	ord (n 0) (l (length mpg123*music-alist))
 	r tmp buffer-read-only (p (point)) currentp
@@ -1733,7 +1758,9 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
     (error "Not on music list"))
   (let*((n (mpg123:get-music-number)) p c
 	(file (mpg123:get-music-info n 'filename)))
-    (message "Delete file?(%s) [Y]es, [L]from list, [N]o"
+    (message (mpg123:lang-msg
+	      "Delete file?(%s) [Y]es, [L]from list, [N]o"
+	      "消してええ?(%s) Y=>よか  L=>曲一覧から  N=>だめ")
 	     (file-name-nondirectory file))
     (setq c (read-char))
     (cond
@@ -1754,7 +1781,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 		       (progn (forward-line 1) (point)))
 	(mpg123:delete-music-from-list n)))
      (t
-      (message "Canceled")))))
+      (message (mpg123:lang-msg "Canceled" "な、やめとこな"))))))
 
 (defun mpg123-quit (&optional yes)
   "Quit"
@@ -1962,46 +1989,85 @@ cf. NetBSD:/usr/share/misc/magic
 			""))
 	    basename))))))
 
+(defvar mpg123-lang
+  (if (and (boundp 'current-language-environment)
+	   (stringp current-language-environment))
+      (let ((l current-language-environment))
+	(cond
+	 ((string-match "[Jj]apanese" l)	1)
+	 (t					0)))
+    (if (or (featurep 'mule) (boundp 'mule))
+	1
+      0))
+  "Symbolic language number of running Emacs.")
+
+(defun mpg123:lang-msg (&rest msglist)
+  (nth (if (< mpg123-lang (length msglist))
+	   mpg123-lang
+	 0)
+       msglist))
+
 (defun mpg123:insert-help ()
   "Insert help string to current buffer."
   (if mpg123-show-help
-      (insert (substitute-command-keys "
+      (unwind-protect
+	  (let ((m (if (fboundp 'm) (symbol-function 'm))))
+	    (fset 'm 'mpg123:lang-msg)
+	    (insert (substitute-command-keys (concat "
 mpg123:
-\\[mpg123-play-stop]	Play or pause
-\\[mpg123-play]	Play
-\\[mpg123-mark-position]	Mark position (when playing)
-\\[mpg123-refrain]	Restart from marked position
-\\[mpg123-where-is-mark]	Where is the marked position
+\\[mpg123-what-file]	" (m "Show the real filename" "ファイル名を表示") "
+\\[mpg123-goto-current-line]	" (m "Go to current music line"
+				     "現在曲の行へ移動") "
+\\[mpg123-play-stop]	" (m "Play or pause" "再生/停止") "
+\\[mpg123-play]	" (m "Play" "再生") "
+\\[mpg123-mark-position]	" (m "Mark position (when playing)"
+				     "現在の再生位置をマーク(再生中のみ)") "
+\\[mpg123-refrain]	" (m "Restart from marked position"
+			     "マークした位置に戻って再生") "
+\\[mpg123-where-is-mark]	" (m "Where is the marked position"
+				     "マークした位置の確認") "
 \\[mpg123-<]	<<
 \\[mpg123->]	>>
-\\[mpg123-forward]	Forward 1 sec
-\\[mpg123-backward]	Backward 1 sec
-\\[mpg123-forward-10]	Forward 10 sec
-\\[mpg123-backward-10]	Backard 10 sec
-\\[mpg123-next-line]	Move to next line
-\\[mpg123-prev-line]	Move to previous line
-\\[mpg123-volume-increase]	Volume up
-\\[mpg123-volume-decrease]	Volume down
-\\[mpg123-open-new]	Open other directory or playlist file
-\\[mpg123-add-new]	Add other directory or playlist file
-\\[mpg123-save-playlist]	Save current playlist to a file
-\\[mpg123-increase-repeat-count]	Increase repetition count
-\\[mpg123-decrease-repeat-count]\tDecrease repetition count (-1 for infinity)
-\\[mpg123-shuffle]	Shuffle music list
-\\[mpg123-kill-line]	Kill music line and push onto stack
-\\[mpg123-yank-line]	Yank music line from stack
-\\[mpg123-quit]	Quit
-\\[mpg123-quit-yes]	Quit without query
-\\[mpg123-mouse-force-play]	Select a music directly on the mouse cursor
-0..9	Digit argument (ex. 50V increase volume by 50steps)
+\\[mpg123-forward]	" (m "Forward 1 sec" "1秒進める") "
+\\[mpg123-backward]	" (m "Backward 1 sec" "1秒戻す") "
+\\[mpg123-forward-10]	" (m "Forward 10 sec" "10秒進める") "
+\\[mpg123-backward-10]	" (m "Backard 10 sec" "10秒戻す") "
+\\[mpg123-next-line]	" (m "Move to next line" "次の行へ")"
+\\[mpg123-prev-line]	" (m "Move to previous line" "前の行へ") "
+\\[mpg123-volume-increase]	" (m "Volume up" "音量増加") "
+\\[mpg123-volume-decrease]	" (m "Volume down" "音量減少") "
+\\[mpg123-open-new]	" (m "Open other directory or playlist file"
+			     "別のディレクトリ(またはプレイリスト)を開く") "
+\\[mpg123-add-new]	" (m "Add other directory or playlist file"
+			     "別のディレクトリ(またはプレイリスト)を追加") "
+\\[mpg123-save-playlist]	" (m "Save current playlist to a file"
+				     "現在のリストをファイルに保存") "
+\\[mpg123-increase-repeat-count]	" (m "Increase repetition count"
+					     "繰り返し数を増加") "
+\\[mpg123-decrease-repeat-count]\t" (m "Decrease repetition count (-1 for infinity)"
+				       "繰り返し数を減少(-1で無限回)") "
+\\[mpg123-shuffle]	" (m "Shuffle music list" "再生リストのシャッフル") "
+\\[mpg123-kill-line]	" (m "Kill music line and push onto stack"
+			     "現在行をスタックへ移動(kill)") "
+\\[mpg123-yank-line]	" (m "Yank music line from stack"
+			     "スタックの一番上から曲を戻す(yank)") "
+\\[mpg123-quit]	" (m "Quit" "終了") "
+\\[mpg123-quit-yes]	" (m "Quit without query" "終了(確認なし)") "
+\\[mpg123-mouse-force-play]	" (m "Select a music directly on the mouse cursor"
+				     "マウスポインタの位置の曲を再生") "
+0..9	" (m "Digit argument (ex. 50V increase volume by 50steps)"
+	     "数引数 (50V とやると50段階音量増加)") "
 ----
-The delimiter line \"-------\" is the indicator of currently playing position.
+" (m "The delimiter line \"-------\" is the indicator of currently playing position.
 You may see the slider on the line running from left to right while the
 music's going ahead.  If you hit \\[mpg123-play] or \\[mpg123-mouse-force-play] on the indicator line,
-the music will immediately move to that position.
-"
-))))
-
+the music will immediately move to that position."
+     "曲一覧の下にある \"-------\" の行は現在の曲の再生位置を相対的に示して
+移動する。この行の好きな位置にポイントを合わせて \\[mpg123-play] または
+\\[mpg123-mouse-force-play] を押すとその曲のうち指定した位置にジャンプする。
+あ、このヘルプが英語の方がかちょええ場合は (setq mpg123-lang 0) すべし。
+"))))
+	    (if m (fset 'm m) (fmakunbound 'm))))))
 
 (defun mpg123:format-line (n)
   (if (stringp n) (setq n (string-to-int n)))
@@ -2085,13 +2151,13 @@ the music will immediately move to that position.
       (let ((istart mpg123*end-of-list-marker))
 	(setq mpg123*indicator-overlay
 	      (make-overlay istart (+ mpg123*window-width -1 istart)))))
-  (insert "\nVolume: [")
+  (insert "\n" (mpg123:lang-msg "Volume" "音量") ": [")
   (if (markerp mpg123*volume-marker)
       (set-marker mpg123*volume-marker nil))
   (setq mpg123*volume-marker (point-marker))
   (insert (format "--:--]"))
   (mpg123:update-volume (mpg123:get-volume))
-  (insert " Repeat: [")
+  (insert " " (mpg123:lang-msg "Repeat" "繰り返し数") ": [")
   (if (markerp mpg123*repeat-count-marker)
       (set-marker mpg123*repeat-count-marker nil))
   (setq mpg123*repeat-count-marker (point-marker))
@@ -2258,6 +2324,13 @@ the music will immediately move to that position.
 	 (funcall
 	  (if arg 'abbreviate-file-name 'file-name-nondirectory)
 	  (mpg123:get-music-info n 'filename))))))
+
+(defun mpg123-goto-current-line ()
+  "Go to current or most recently played music line."
+  (interactive)
+  (if (numberp mpg123*cur-music-number)
+      (mpg123:goto-playtime-position)
+    (message (mpg123:lang-msg "Not yet played." "まだ再生しとらん"))))
 
 (defun mpg123:initialize ()
   (if (get 'mpg123:initialize 'done)
