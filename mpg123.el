@@ -2,20 +2,20 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Nov 25 00:00:57 2000 on firestorm
-;;; Update count: 702
+;;; Last modified Fri Dec  8 09:48:10 2000 on buell
+;;; Update count: 807
 
 ;;[Commentary]
 ;;	
 ;;	This package is a front-end program to mpg123 audio player.
-;;	mpg123$B$N:F@8%U%m%s%H%(%s%I$G$9!#(B
+;;	mpg123¤ÎºÆÀ¸¥Õ¥í¥ó¥È¥¨¥ó¥É¤Ç¤¹¡£
 ;;	
 ;;[Requirement]
 ;;	
-;;	The `mpg123' program version 0.59q and enough CPU power to run
-;;	it.
-;;	mpg123 0.59q$B$H$=$l$rAv$i$9$N$K==J,$J(BCPU$B%Q%o!<!#(B
-;;	$B:GDc$G$b(BMMX??
+;;	The `mpg123' program version 0.59q or later, and enough CPU
+;;	power to run it.
+;;	mpg123 0.59q¤È¤½¤ì¤òÁö¤é¤¹¤Î¤Ë½½Ê¬¤ÊCPU¥Ñ¥ï¡¼¡£
+;;	ºÇÄã¤Ç¤âMMX??
 ;;	
 ;;[Installation]
 ;;	
@@ -28,12 +28,12 @@
 ;;	  [~/.emacs]
 ;;		(autoload 'mpg123 "mpg123" "A Front-end to mpg123" t)
 ;;	
-;;	$B$^$:!"(Bmpg123$B$N@5>oF0:n$r3NG'$7$F$+$i>e$N9T$r(B~/.emacs$B$KDI2C$7$^$9!#(B
-;;	$B$J$*(Bmpg123$B$O(B0.59q$B0J>e$G$J$$$H@5>o$KF0:n$7$J$$2DG=@-$,$"$j$^$9(B($B$b$C(B
-;;	$B$H?7$7$$$N$,=P$?$i$^$?2x$7$$$+$b$7$l$s!D(B)$B!#(Bmpg123 $B$K(B -v $B%*%W%7%g(B
-;;	$B%s$r$D$1$F5/F0$72;3Z$N:F@8$H$H$b$K%G%3!<%ICf$N%U%l!<%`HV9f$,2hLL(B
-;;	$B$KI=<($5$l$k$+$I$&$+3NG'$7$F$/$@$5$$!#$3$l$,$&$^$/9T$+$J$$$H$3$N(B
-;;	$B%W%m%0%i%`$b$&$^$/F0$-$^$;$s!#(B
+;;	¤Þ¤º¡¢mpg123¤ÎÀµ¾ïÆ°ºî¤ò³ÎÇ§¤·¤Æ¤«¤é¾å¤Î¹Ô¤ò~/.emacs¤ËÄÉ²Ã¤·¤Þ¤¹¡£
+;;	¤Ê¤ªmpg123¤Ï0.59q°Ê¾å¤Ç¤Ê¤¤¤ÈÀµ¾ï¤ËÆ°ºî¤·¤Ê¤¤²ÄÇ½À­¤¬¤¢¤ê¤Þ¤¹(¤â¤Ã
+;;	¤È¿·¤·¤¤¤Î¤¬½Ð¤¿¤é¤Þ¤¿²ø¤·¤¤¤«¤â¤·¤ì¤ó¡Ä)¡£mpg123 ¤Ë -v ¥ª¥×¥·¥ç
+;;	¥ó¤ò¤Ä¤±¤Æµ¯Æ°¤·²»³Ú¤ÎºÆÀ¸¤È¤È¤â¤Ë¥Ç¥³¡¼¥ÉÃæ¤Î¥Õ¥ì¡¼¥àÈÖ¹æ¤¬²èÌÌ
+;;	¤ËÉ½¼¨¤µ¤ì¤ë¤«¤É¤¦¤«³ÎÇ§¤·¤Æ¤¯¤À¤µ¤¤¡£¤³¤ì¤¬¤¦¤Þ¤¯¹Ô¤«¤Ê¤¤¤È¤³¤Î
+;;	¥×¥í¥°¥é¥à¤â¤¦¤Þ¤¯Æ°¤­¤Þ¤»¤ó¡£
 ;;	
 ;;[How to Play the music]
 ;;	
@@ -49,25 +49,25 @@
 ;;	start the  music.  All key bindings  are shown at  the bottom of
 ;;	music list buffer.  Please take a look at it.
 ;;	
-;;	$B4{$K(B MPEG1 audio Layer I/II/III $B%U%!%$%k$O;}$C$F$k$b$N$H$7$F@bL@(B
-;;	$B$7$^$9(B($B$?$V$s$$$o$f$k(BMP3$B$7$+;}$C$F$J$$$H;W$&$1$I5$$K$7$J$$$o$7$b(B
-;;	Layer2$B$H(B3$B$O:n$C$?$3$H$9$i$J$$(B)$B!#$G!"$=$N%U%!%$%k$O$-$C$H$I$3$+$N(B
-;;	$B%G%#%l%/%H%j$K@0M}$7$F$*$$$F$"$k$H;W$&$N$G!"2;3Z$rJ9$-$?$/$J$C$?(B
-;;	$B$i!"$^$:(BEmacs$B$r5/F0$7!"(B
+;;	´û¤Ë MPEG1 audio Layer I/II/III ¥Õ¥¡¥¤¥ë¤Ï»ý¤Ã¤Æ¤ë¤â¤Î¤È¤·¤ÆÀâÌÀ
+;;	¤·¤Þ¤¹(¤¿¤Ö¤ó¤¤¤ï¤æ¤ëMP3¤·¤«»ý¤Ã¤Æ¤Ê¤¤¤È»×¤¦¤±¤Éµ¤¤Ë¤·¤Ê¤¤¤ï¤·¤â
+;;	Layer2¤È3¤Ïºî¤Ã¤¿¤³¤È¤¹¤é¤Ê¤¤)¡£¤Ç¡¢¤½¤Î¥Õ¥¡¥¤¥ë¤Ï¤­¤Ã¤È¤É¤³¤«¤Î
+;;	¥Ç¥£¥ì¥¯¥È¥ê¤ËÀ°Íý¤·¤Æ¤ª¤¤¤Æ¤¢¤ë¤È»×¤¦¤Î¤Ç¡¢²»³Ú¤òÊ¹¤­¤¿¤¯¤Ê¤Ã¤¿
+;;	¤é¡¢¤Þ¤ºEmacs¤òµ¯Æ°¤·¡¢
 ;;	
-;;		M-x mpg123 $B$Z$7(B
-;;		$B%G%#%l%/%H%jL>(B ($B$^$?$O%W%l%$%j%9%H%U%!%$%kL>(B) $B$Z$7(B
+;;		M-x mpg123 ¤Ú¤·
+;;		¥Ç¥£¥ì¥¯¥È¥êÌ¾ (¤Þ¤¿¤Ï¥×¥ì¥¤¥ê¥¹¥È¥Õ¥¡¥¤¥ëÌ¾) ¤Ú¤·
 ;;	
-;;	$B$HBG$A$^$9!#$H!"$=$N%G%#%l%/%H%j$K$"$k2;3Z%U%!%$%k0lMw$,=P$FMh$k(B
-;;	$B$N$G!"J9$-$?$$6J$K9g$o$;$F(BSPC$B$rBG$D$H1iAU$,;O$^$j$^$9!#$=$NB>$N(B
-;;	$B%-!<%3%^%s%I$O2;3Z0lMw%P%C%U%!$NKvHx$KI=<($5$l$F$$$k$N$G$=$C$A$r(B
-;;	$B8+$F$/$@$5$$!#(B
+;;	¤ÈÂÇ¤Á¤Þ¤¹¡£¤È¡¢¤½¤Î¥Ç¥£¥ì¥¯¥È¥ê¤Ë¤¢¤ë²»³Ú¥Õ¥¡¥¤¥ë°ìÍ÷¤¬½Ð¤ÆÍè¤ë
+;;	¤Î¤Ç¡¢Ê¹¤­¤¿¤¤¶Ê¤Ë¹ç¤ï¤»¤ÆSPC¤òÂÇ¤Ä¤È±éÁÕ¤¬»Ï¤Þ¤ê¤Þ¤¹¡£¤½¤ÎÂ¾¤Î
+;;	¥­¡¼¥³¥Þ¥ó¥É¤Ï²»³Ú°ìÍ÷¥Ð¥Ã¥Õ¥¡¤ÎËöÈø¤ËÉ½¼¨¤µ¤ì¤Æ¤¤¤ë¤Î¤Ç¤½¤Ã¤Á¤ò
+;;	¸«¤Æ¤¯¤À¤µ¤¤¡£
 ;;	
 ;;[Playlist]
 ;;	
-;;	If you  give `M-x mpg123' a  simple file whose  consists of file
+;;	If you  give `M-x mpg123' a  simple file which  consists of file
 ;;	name list;  one file  name per line,  mpg123.el assumes it  as a
-;;	playlist  file.  All  of mp3  files  listed in  playlist file  a
+;;	playlist file.   All of  mp3 files listed  in playlist  file are
 ;;	incorporated in *mpg123* playing  buffer.  If a line in playlist
 ;;	points  to another  playlist file,  file is  parsed recursively.
 ;;	There are mainly two ways to create a playlist file.
@@ -79,24 +79,23 @@
 ;;	Because a playlist is very simple, you can edit it manually to
 ;;	arrange the order of music list.
 ;;	
-;;	M-x mpg123 $B$N$"$H$K!"0l9T$K0l$D(BMP3$B%U%!%$%k$NL>A0$,=q$+$l$?IaDL$N(B
-;;	$B%U%!%$%k$r;XDj$9$k$H(Bmpg123.el$B$O$=$l$r%W%l%$%j%9%H%U%!%$%k$@$H$_(B
-;;	$B$J$7!"$=$3$K=q$+$l$F$$$k(BMP3$B%U%!%$%k72$r(B *mpg123* $B2;3Z0lMw%P%C%U%!(B
-;;	$B$KA4$F<h$j9~$_$^$9!#%W%l%$%j%9%H%U%!%$%k$r:n$k$K$OFs$D$NJ}K!$,$"(B
-;;	$B$j$^$9!#(B
+;;	M-x mpg123 ¤Î¤¢¤È¤Ë¡¢°ì¹Ô¤Ë°ì¤ÄMP3¥Õ¥¡¥¤¥ë¤ÎÌ¾Á°¤¬½ñ¤«¤ì¤¿ÉáÄÌ¤Î
+;;	¥Õ¥¡¥¤¥ë¤ò»ØÄê¤¹¤ë¤Èmpg123.el¤Ï¤½¤ì¤ò¥×¥ì¥¤¥ê¥¹¥È¥Õ¥¡¥¤¥ë¤À¤È¤ß
+;;	¤Ê¤·¡¢¤½¤³¤Ë½ñ¤«¤ì¤Æ¤¤¤ëMP3¥Õ¥¡¥¤¥ë·²¤ò *mpg123* ²»³Ú°ìÍ÷¥Ð¥Ã¥Õ¥¡
+;;	¤ËÁ´¤Æ¼è¤ê¹þ¤ß¤Þ¤¹¡£¥×¥ì¥¤¥ê¥¹¥È¥Õ¥¡¥¤¥ë¤òºî¤ë¤Ë¤ÏÆó¤Ä¤ÎÊýË¡¤¬¤¢
+;;	¤ê¤Þ¤¹¡£
 ;;	
-;;		* $B2;3Z0lMw(B(*mpg123*)$B%P%C%U%!$G(B S $B$r2!$9(B
-;;		* $B%7%'%k$N>e$GD>@\:n$k(B
-;;		  $B!ZNc![(B % ls */*.mp3 > playlist
+;;		* ²»³Ú°ìÍ÷(*mpg123*)¥Ð¥Ã¥Õ¥¡¤Ç S ¤ò²¡¤¹
+;;		* ¥·¥§¥ë¤Î¾å¤ÇÄ¾ÀÜºî¤ë
+;;		  ¡ÚÎã¡Û % ls */*.mp3 > playlist
 ;;	
-;;	$B%W%l%$%j%9%H%U%!%$%k$O$H$F$bC1=c$J$N$G!"D>@\JT=8$7$F9%$-$J6J=g$r(B
-;;	$B%j%9%H$r:n$k$N$O4JC1$G$7$g$&!#(B
+;;	¥×¥ì¥¤¥ê¥¹¥È¥Õ¥¡¥¤¥ë¤Ï¤È¤Æ¤âÃ±½ã¤Ê¤Î¤Ç¡¢Ä¾ÀÜÊÔ½¸¤·¤Æ¹¥¤­¤Ê¶Ê½ç¤ò
+;;	¥ê¥¹¥È¤òºî¤ë¤Î¤Ï´ÊÃ±¤Ç¤·¤ç¤¦¡£¥×¥ì¥¤¥ê¥¹¥È¥Õ¥¡¥¤¥ëÃæ¤ËÊÌ¤Î¥×¥ì¥¤
+;;	¥ê¥¹¥È¤ò»ØÄê¤¹¤ë¤³¤È¤â¤Ç¤­¤Þ¤¹¡£
 ;;	
 ;;[Configuration]
 ;;	
-;;	Because this program is designed for mpg123 0.59q, there not so
-;;	many configurable aspects.  Here are the customization
-;;	variables.
+;;	Here are the variables for your customization.
 ;;	
 ;;	  [Variable]		[Default value/Meaning]
 ;;	  mpg123-command	"mpg123"
@@ -122,29 +121,45 @@
 ;;	  mpg123-lazy-check	nil
 ;;				Check sound file or not by filename
 ;;	
-;;	$B$[$\(B mpg123 0.59q $B$K7h$aBG$A$H$$$&Iw>p$J$N$G!"$"$^$j$$$8$l$k$H$3(B
-;;	$B$mL5$$$1$I!">e$K=q$$$F$"$kJQ?t$,$$$8$l$^$9!#(B
-;;	$B%o%?%7(BLinux$B%o%C%+%j%^%;!A%s(B! $B$[$H$s$I$N(BLinux$B$GDLMQ$9$k2;NLD4@a%3(B
-;;	$B%^%s%I$,$"$C$?$i65$($F$/$@$5$$$J!#(B
-;;	aumix -v $B!VI4J,N(!W$G$($($N(B?
+;;	  mpg123-face-playing	'("yellow" . "#004080")
+;;				Cons of default playing cursor color
+;;				'(FGCOLOR . BGCOLOR)
+;;	  mpg123-face-slider	'("black" . "yellow")
+;;				Cons of default playing position slider color
+;;	  mpg123-need-slider	t on color display, else nil
+;;				Whether the playing position slider is
+;;				needed or not
+;;	
+;;	¤Û¤Ü mpg123 0.59q ¤Ë·è¤áÂÇ¤Á¤È¤¤¤¦É÷¾ð¤Ê¤Î¤Ç¡¢¤¢¤Þ¤ê¤¤¤¸¤ì¤ë¤È¤³
+;;	¤íÌµ¤¤¤±¤É¡¢¾å¤Ë½ñ¤¤¤Æ¤¢¤ëÊÑ¿ô¤¬¤¤¤¸¤ì¤Þ¤¹¡£
+;;	
+;;	¤Ê¤ªLinux¤Ç¤Ï²»ÎÌÄ´Àá¥³¥Þ¥ó¥É¤È¤·¤Æ aumix -w ¤ÎÍøÍÑ¤òÁ°Äó¤È¤·¤Þ¤¹¡£
+;;	¤³¤Î¥×¥í¥°¥é¥à¤Ç²»ÎÌ¤ò¤¤¤¸¤ê¤¿¤¤¤È¤­¤Ï aumix ¤ò¥¤¥ó¥¹¥È¡¼¥ë¤·¤Æ¤ª
+;;	¤­¤Þ¤·¤ç¤¦¡£
 ;;	
 ;;[More comfortable]
 ;;	
 ;;	Yes, Emacs is the editor.  Even though you are listening to the
 ;;	music, you have to edit something!! :)
-;;	This program occupies one Emacs window.  Using this program
-;;	without any window manager is hard job.  Please use this with
-;;	windows.el - The Window Manager for Emacs - which can be
-;;	obtained from http://www.gentei.org/~yuuji/software/.
 ;;	
-;;	Emacs$B;H$C$F$k$s$@$+$iJ9$/$P$C$+$j$8$c$J$/$FJT=8$7$J$5$$(B!  $B$F$3$H(B
-;;	$B$G!"A4%U%l!<%`$r>CHq$9$k(Bmpg123.el$B$rAG$N(BEmacs$B$G;H$C$F$?$iBgJQ!#$?(B
-;;	$B$a$7$K(B windows.el $B$H0l=o$K$D$3$F$_$F$M!#%U%l!<%`$r;H$C$F$k$H$-$O(B
-;;	$BJL%U%l!<%`$G%P%C%/%0%i%&%s%I:F@8!"(B-nw $B$G5/F0$7$F$$$k$H$-$ON"%&%#(B
-;;	$B%s%I%&$G%P%C%/%0%i%&%s%I:F@8$G$-$F!"$=$NN"%&%#%s%I%&$H$$$/$D$+$N(B
-;;	$BJT=8%&%#%s%I%&$r@ZBX$($F;H$&$J$s$F;v$b2DG=!#$b$A$m$s$3$NJ8>O$bN"(B
-;;	$B$KH>J,1#$l$F$k%U%l!<%`$G(Bmpg123$B$rAv$i$;$J$,$i=q$$$F$^$9!#(B
-;;	windows.el $B$O(B http://www.gentei.org/~yuuji/software/ $B$+$i$I$&$>!#(B
+;;	This  program occupies  one  Emacs window.   Using this  program
+;;	without any  window manager is  hard job.  Please use  this with
+;;	windows.el  -  The Window  Manager  for  Emacs  - which  can  be
+;;	obtained   from   http://www.gentei.org/~yuuji/software/.   With
+;;	windows.el,  you can  listen the  music  which is  run in  other
+;;	frame. Or  if you use  emacs -nw, you  can run mpg123.el  in the
+;;	background  window and  can  switch from  and  to mpg123  buffer
+;;	alternatively.   Of  course,  I'm  writing this  document  while
+;;	mpg123.el is running in the background window.
+;;	
+;;	Emacs»È¤Ã¤Æ¤ë¤ó¤À¤«¤éÊ¹¤¯¤Ð¤Ã¤«¤ê¤¸¤ã¤Ê¤¯¤ÆÊÔ½¸¤·¤Ê¤µ¤¤!  ¤Æ¤³¤È
+;;	¤Ç¡¢Á´¥Õ¥ì¡¼¥à¤ò¾ÃÈñ¤¹¤ëmpg123.el¤òÁÇ¤ÎEmacs¤Ç»È¤Ã¤Æ¤¿¤éÂçÊÑ¡£¤¿
+;;	¤á¤·¤Ë windows.el ¤È°ì½ï¤Ë¤Ä¤³¤Æ¤ß¤Æ¤Í¡£¥Õ¥ì¡¼¥à¤ò»È¤Ã¤Æ¤ë¤È¤­¤Ï
+;;	ÊÌ¥Õ¥ì¡¼¥à¤Ç¥Ð¥Ã¥¯¥°¥é¥¦¥ó¥ÉºÆÀ¸¡¢-nw ¤Çµ¯Æ°¤·¤Æ¤¤¤ë¤È¤­¤ÏÎ¢¥¦¥£
+;;	¥ó¥É¥¦¤Ç¥Ð¥Ã¥¯¥°¥é¥¦¥ó¥ÉºÆÀ¸¤Ç¤­¤Æ¡¢¤½¤ÎÎ¢¥¦¥£¥ó¥É¥¦¤È¤¤¤¯¤Ä¤«¤Î
+;;	ÊÔ½¸¥¦¥£¥ó¥É¥¦¤òÀÚÂØ¤¨¤Æ»È¤¦¤Ê¤ó¤Æ»ö¤â²ÄÇ½¡£¤â¤Á¤í¤ó¤³¤ÎÊ¸¾Ï¤âÎ¢
+;;	¤ËÈ¾Ê¬±£¤ì¤Æ¤ë¥Õ¥ì¡¼¥à¤Çmpg123¤òÁö¤é¤»¤Ê¤¬¤é½ñ¤¤¤Æ¤Þ¤¹¡£
+;;	windows.el ¤Ï http://www.gentei.org/~yuuji/software/ ¤«¤é¤É¤¦¤¾¡£
 ;;	
 ;;[Bugs]
 ;;	
@@ -153,14 +168,18 @@
 ;;	such case, mpg123.el cannot  detect that condition.  If you come
 ;;	to see such behavior, please pause and restart player by SPC key.
 ;;	
-;;	$B$?$^$K(Bmpg123$B$,F0$$$F$O$$$k$b$N$N2;$r=P$5$J$/$J$C$F$7$^$&$3$H$,$"(B
-;;	$B$j$^$9!#$=$N$h$&$J5sF0$r(Bmpg123.el$B$O8!=P$G$-$J$$$N$G!"$=$&$J$C$?(B
-;;	$B$i(BSPC$B$G0lC6;_$a$FF0$+$7D>$7$F$/$@$5$$!#(BEmacs19$B%Y!<%9$N(BMule$B$G$OJ#(B
-;;	$B;($JM}M3$K$h$jJL%U%l!<%`$G1iAUCf$K<!$N6J$K?J$`$H!"<!$N6J$K0\$C$?(B
-;;	$BD>8e$N%-!<$r1iAUMQ%P%C%U%!$K<h$i$l$F$7$^$$!"$J$*$+$D1iAU;~4V$N99(B
-;;	$B?7$,(B($B$_$+$1>e(B)$B<!$K%-!<F~NO$9$k$^$G;_$^$C$F$7$^$$$^$9!#$=$&$J$C$F(B
-;;	$B$7$^$&3NN($,2<$,$k$h$&$J9)IW$O$7$F$_$^$7$?$,:,K\E*2r7h$K$O;j$j$^(B
-;;	$B$;$s$G$7$?!#(B
+;;	¤¿¤Þ¤Ëmpg123¤¬Æ°¤¤¤Æ¤Ï¤¤¤ë¤â¤Î¤Î²»¤ò½Ð¤µ¤Ê¤¯¤Ê¤Ã¤Æ¤·¤Þ¤¦¤³¤È¤¬¤¢
+;;	¤ê¤Þ¤¹¡£¤½¤Î¤è¤¦¤ÊµóÆ°¤òmpg123.el¤Ï¸¡½Ð¤Ç¤­¤Ê¤¤¤Î¤Ç¡¢¤½¤¦¤Ê¤Ã¤¿
+;;	¤éSPC¤Ç°ìÃ¶»ß¤á¤ÆÆ°¤«¤·Ä¾¤·¤Æ¤¯¤À¤µ¤¤¡£Emacs19¥Ù¡¼¥¹¤ÎMule¤Ç¤ÏÊ£
+;;	»¨¤ÊÍýÍ³¤Ë¤è¤êÊÌ¥Õ¥ì¡¼¥à¤Ç±éÁÕÃæ¤Ë¼¡¤Î¶Ê¤Ë¿Ê¤à¤È¡¢¼¡¤Î¶Ê¤Ë°Ü¤Ã¤¿
+;;	Ä¾¸å¤Î¥­¡¼¤ò±éÁÕÍÑ¥Ð¥Ã¥Õ¥¡¤Ë¼è¤é¤ì¤Æ¤·¤Þ¤¤¡¢¤Ê¤ª¤«¤Ä±éÁÕ»þ´Ö¤Î¹¹
+;;	¿·¤¬(¤ß¤«¤±¾å)¼¡¤Ë¥­¡¼ÆþÎÏ¤¹¤ë¤Þ¤Ç»ß¤Þ¤Ã¤Æ¤·¤Þ¤¤¤Þ¤¹¡£¤½¤¦¤Ê¤Ã¤Æ
+;;	¤·¤Þ¤¦³ÎÎ¨¤¬²¼¤¬¤ë¤è¤¦¤Ê¹©É×¤Ï¤·¤Æ¤ß¤Þ¤·¤¿¤¬º¬ËÜÅª²ò·è¤Ë¤Ï»ê¤ê¤Þ
+;;	¤»¤ó¤Ç¤·¤¿¡£
+;;	
+;;	Play/Stop control against the  music in the stack buffer doesn't
+;;	work.   Although  it is  feasible,  the  feature isn't  actually
+;;	usefull and ends in self-satisfaction.  So, no plan to make it.
 ;;	
 ;;[No Warranty]
 ;;	
@@ -172,12 +191,12 @@
 ;;	easy to write me comments, bug-reports.
 ;;							yuuji@gentei.org
 ;;	
-;;	$B$3$N%W%m%0%i%`$O%U%j!<%=%U%H%&%'%"$H$7$FG[I[$7$^$9!#$3$N%W%m%0%i(B
-;;	$B%`$NMxMQ$K$h$C$F@8$8$?$$$+$J$k7k2L$KBP$7$F$b:n<T$O@UG$$rIi$$$^$;(B
-;;	$B$s!#%3%a%s%H$d%P%0%l%]!<%H$O$*$*$$$K4?7^$7$^$9$N$G8f5$7Z$K8fO"Mm(B
-;;	$B$/$@$5$$!#$^$?%W%m%0%i%`$KBP$9$k8D?ME*$J=$@5$O<+M3$K$7$FD:$$$F9=(B
-;;	$B$$$^$;$s$,!"$=$l$r8x3+$7$?$$>l9g$O;d$^$G8fO"Mm$/$@$5$$!#O"Mm$O0J(B
-;;	$B2<$N%"%I%l%9$^$G$*4j$$$7$^$9(B(2000/8$B8=:_(B)$B!#(B
+;;	¤³¤Î¥×¥í¥°¥é¥à¤Ï¥Õ¥ê¡¼¥½¥Õ¥È¥¦¥§¥¢¤È¤·¤ÆÇÛÉÛ¤·¤Þ¤¹¡£¤³¤Î¥×¥í¥°¥é
+;;	¥à¤ÎÍøÍÑ¤Ë¤è¤Ã¤ÆÀ¸¤¸¤¿¤¤¤«¤Ê¤ë·ë²Ì¤ËÂÐ¤·¤Æ¤âºî¼Ô¤ÏÀÕÇ¤¤òÉé¤¤¤Þ¤»
+;;	¤ó¡£¥³¥á¥ó¥È¤ä¥Ð¥°¥ì¥Ý¡¼¥È¤Ï¤ª¤ª¤¤¤Ë´¿·Þ¤·¤Þ¤¹¤Î¤Ç¸æµ¤·Ú¤Ë¸æÏ¢Íí
+;;	¤¯¤À¤µ¤¤¡£¤Þ¤¿¥×¥í¥°¥é¥à¤ËÂÐ¤¹¤ë¸Ä¿ÍÅª¤Ê½¤Àµ¤Ï¼«Í³¤Ë¤·¤ÆÄº¤¤¤Æ¹½
+;;	¤¤¤Þ¤»¤ó¤¬¡¢¤½¤ì¤ò¸ø³«¤·¤¿¤¤¾ì¹ç¤Ï»ä¤Þ¤Ç¸æÏ¢Íí¤¯¤À¤µ¤¤¡£Ï¢Íí¤Ï°Ê
+;;	²¼¤Î¥¢¥É¥ì¥¹¤Þ¤Ç¤ª´ê¤¤¤·¤Þ¤¹(2000/12¸½ºß)¡£
 ;;							yuuji@gentei.org
 ;;[Acknowledgements]
 ;;	
@@ -214,9 +233,21 @@
 ;;	Alex Shinn <foof@debian.org>
 ;;		Patch to handle mp3 files in multiple directories.
 ;;		Implemented `playlist'.
+;;	Seiichi Namba <sn@asahi-net.email.ne.jp>
+;;		Many collaboration codes for working with dired-dd.
+;;		Made dired-dd-mpg123.
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.17  2000/12/08 00:54:09  yuuji
+;; Variable mpg123-face-playing specifies the color of cursor for playing music.
+;; Variable mpg123-face-slider specifies the color of slider of playing position.
+;; Variable mpg123-need-slider specifies wheter the slider is needed or not.
+;; Mouse-2 selects directly a music on the mouse pointer(in music list) or
+;; playing position(in delimiter line).
+;; RET(M-x mpg123-play) on the delimiter line move the playing position
+;; according to the proportion of the window width from left side.
+;;
 ;; Revision 1.16  2000/11/24 15:09:22  yuuji
 ;; Support emacs-21.0.9x (in mpg123:mp3-p)
 ;;
@@ -254,17 +285,17 @@
 ;; defmacro changed to defsubst
 ;;
 ;; Revision 1.5  1999/07/24 03:58:52  yuuji
-;; mule2$B$G$J$k$Y$/6JO"78$,ES@Z$l$J$$$h$&$K9)IW(B($B40`z$G$O$J$$(B)$B!#(B
+;; mule2¤Ç¤Ê¤ë¤Ù¤¯¶ÊÏ¢·¸¤¬ÅÓÀÚ¤ì¤Ê¤¤¤è¤¦¤Ë¹©É×(´°àú¤Ç¤Ï¤Ê¤¤)¡£
 ;;
 ;; Revision 1.4  1999/07/05 09:00:19  yuuji
-;; $BF|K\8l%U%!%$%kL>BP1~(B($B$?$V$s(B)
+;; ÆüËÜ¸ì¥Õ¥¡¥¤¥ëÌ¾ÂÐ±þ(¤¿¤Ö¤ó)
 ;; \C-d (mpg123-delete-file)
 ;;
 
 (defvar mpg123-system-type
   (cond
    ((string-match "freebsd" (emacs-version))	'freebsd)
-   ((string-match "netbsd" (emacs-version))	'netbsd)  ;not yet tested
+   ((string-match "netbsd" (emacs-version))	'netbsd)
    ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet tested
    ((string-match "linux" (emacs-version))	'linux)
    ((string-match "nt4\\|windows9" (emacs-version)) 'nt)
@@ -272,7 +303,7 @@
 
 (defvar mpg123-command "mpg123"
   "*Command name of mpg123 player. Need 0.59q or later.
-mpg123$B$N%3%^%s%IL>!#(B0.59q$B$,I,MW!#(B")
+mpg123¤Î¥³¥Þ¥ó¥ÉÌ¾¡£0.59q¤¬É¬Í×¡£")
 (defvar mpg123-command-args nil
   ;;'("--8bit -m")	;<- example
   "*Arguments to give to mpg123")
@@ -281,25 +312,25 @@ mpg123$B$N%3%^%s%IL>!#(B0.59q$B$,I,MW!#(B")
 	     '((freebsd . "mixer") (netbsd . "mixerctl") (linux . "aumix")
 	       (solaris . "audioctl") (nt . "mixer.exe"))))
   "*Command name for mixer setting utility
-mixer$BD4@aMQ%3%^%s%I(B")
+mixerÄ´ÀáÍÑ¥³¥Þ¥ó¥É")
 (defvar mpg123-mixer-setvol-target-list
   (cdr (assq mpg123-system-type
 	     '((freebsd . ("vol" "pcm")) (netbsd . ("outputs.master"))
-	       (linux . ("-v"))
+	       (linux . ("-w"))
 	       (solaris . ("-v")) (nt . ("-v")))))
   "*Option list for volume setting utility.
-mixer$BD4@a%3%^%s%I$N2;NLD4@a%*%W%7%g%s$N%j%9%H(B")
+mixerÄ´Àá¥³¥Þ¥ó¥É¤Î²»ÎÌÄ´Àá¥ª¥×¥·¥ç¥ó¤Î¥ê¥¹¥È")
 (defvar mpg123-preserve-playtime t
   "When shift to other music, leave playing time of current music, or not")
 (defvar mpg123-id3-tag-function 'mpg123:peek-tag
   "*Emacs-Lisp function for extracting ID3 tag.
-MP3$B$+$i(BID3$B$r<hF@$9$k$?$a$N4X?t(B")
+MP3¤«¤éID3¤ò¼èÆÀ¤¹¤ë¤¿¤á¤Î´Ø¿ô")
 (defvar mpg123-startup-volume 30
   "*Default sound volume at startup of this program.
-mpg123.el$B=i2s5/F0;~$N2;NL$N%G%U%)%k%HCM(B.")
+mpg123.el½é²óµ¯Æ°»þ¤Î²»ÎÌ¤Î¥Ç¥Õ¥©¥ë¥ÈÃÍ.")
 (defvar mpg123-default-repeat 0
   "*Default number of repetition of through playing.
-$B:F@8$N%G%U%)%k%H$N%j%T!<%H2s?t(B")
+ºÆÀ¸¤Î¥Ç¥Õ¥©¥ë¥È¤Î¥ê¥Ô¡¼¥È²ó¿ô")
 (defvar mpg123-process-coding-system
   (cond ((and (fboundp 'modify-coding-system-alist)
 	      (intern-soft "euc-jp"))
@@ -307,19 +338,19 @@ mpg123.el$B=i2s5/F0;~$N2;NL$N%G%U%)%k%HCM(B.")
 	((boundp '*euc-japan*) *euc-japan*)
 	nil)
   "*Default process coding system for mpg123.
-mpg123$B%3%^%s%IMQ$N4A;z%3!<%I!#4A;z%U%!%$%kL>$,$"$k$H$-$OI,?\(B")
+mpg123¥³¥Þ¥ó¥ÉÍÑ¤Î´Á»ú¥³¡¼¥É¡£´Á»ú¥Õ¥¡¥¤¥ëÌ¾¤¬¤¢¤ë¤È¤­¤ÏÉ¬¿Ü")
 (defvar mpg123-omit-id3-artist nil
   "*Non-nil for omitting artist name display of ID3 tag.
-non-nil$B$N$H$-(BID3$B%?%0$+$i$N%"!<%A%9%HL>I=<($r>JN,$9$k!#(B")
+non-nil¤Î¤È¤­ID3¥¿¥°¤«¤é¤Î¥¢¡¼¥Á¥¹¥ÈÌ¾É½¼¨¤ò¾ÊÎ¬¤¹¤ë¡£")
 (defvar mpg123-mp3-scan-bytes 3
   "*Default number of bytes of header to examine the file is mp3 or not.
-MP3$B%U%!%$%k$+$I$&$+$rD4$Y$k$?$a$KFI$_9~$`%U%!%$%k$N@hF,$N%P%$%H?t(B")
+MP3¥Õ¥¡¥¤¥ë¤«¤É¤¦¤«¤òÄ´¤Ù¤ë¤¿¤á¤ËÆÉ¤ß¹þ¤à¥Õ¥¡¥¤¥ë¤ÎÀèÆ¬¤Î¥Ð¥¤¥È¿ô")
 
 (defvar mpg123-lazy-check nil
   "*Check sound file or not by filename.
 If want to check by filename, set this variable to filename regexp.
-MP3$B%U%!%$%k$+$I$&$+D4$Y$k$?$a$K%U%!%$%kL>$@$1$G:Q$^$9>l9g$O(B
-$B@55,I=8=$r;XDj$9$k(B.")
+MP3¥Õ¥¡¥¤¥ë¤«¤É¤¦¤«Ä´¤Ù¤ë¤¿¤á¤Ë¥Õ¥¡¥¤¥ëÌ¾¤À¤±¤ÇºÑ¤Þ¤¹¾ì¹ç¤Ï
+Àµµ¬É½¸½¤ò»ØÄê¤¹¤ë.")
 
 (defvar mpg123-show-help t
   "*Print help summary in mpg123 buffer")
@@ -355,10 +386,21 @@ MP3$B%U%!%$%k$+$I$&$+D4$Y$k$?$a$K%U%!%$%kL>$@$1$G:Q$^$9>l9g$O(B
 (define-key mpg123-mode-map "\C-d" 'mpg123-delete-file)
 (define-key mpg123-mode-map "E" 'id3-edit)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
+(define-key mpg123-mode-map "Q" 'mpg123-quit-yes)
 (if (and window-system)
-    (progn
+    (cond
+     ((featurep 'xemacs)
+      (define-key mpg123-mode-map '(button1) 'mpg123-mouse-play-stop)
+      (define-key mpg123-mode-map '(control button4) 'mpg123-volume-increase)
+      (define-key mpg123-mode-map '(control button5) 'mpg123-volume-decrease)
+      (define-key mpg123-mode-map 'button3 'mpg123-mouse-force-play)
+      )
+     (t
       (define-key mpg123-mode-map [down-mouse-1] 'mpg123-mouse-play-stop)
-      ))
+      (define-key mpg123-mode-map [down-mouse-2] 'mpg123-mouse-force-play)
+      (define-key mpg123-mode-map [C-mouse-4] 'mpg123-volume-increase)
+      (define-key mpg123-mode-map [C-mouse-5] 'mpg123-volume-decrease)
+      )))
 (let ((ch ?0))
   (while (<= ch ?9)
     (define-key mpg123-mode-map (char-to-string ch) 'digit-argument)
@@ -462,6 +504,10 @@ MP3$B%U%!%$%k$+$I$&$+D4$Y$k$?$a$K%U%!%$%kL>$@$1$G:Q$^$9>l9g$O(B
   (mpg123-next-line (- arg)))
 
 (defsubst mpg123:goto-playtime-position ()
+  ;;For speed, we do not set-buffer to where mpg123*cur-play inhabits,
+  ;;Confirm yourself to set the current buffer to mpg123*cur-play buffer
+  ;;if you call this from the function that can be called when the
+  ;;currently being played music is in stac-buffer.
   (goto-char mpg123*cur-play-marker)
   (skip-chars-forward "^:")
   (forward-char -2))
@@ -564,13 +610,13 @@ Anyway, you have to make sure that mpg123 program plays
 mp3 files on your pseudo terminal(xterm, rxvt, etc).
 -- Type SPC to exit ---
 
-$B%5%&%s%I%G%P%$%9$,3+$1$sAG!#(B
-$B$3$N%^%7%s$N%*!<%G%#%*%G%P%$%9$O$A$c$s$H@_Dj$7$?$1(B?
-$B$"$H!"$[$+$K%5%&%s%I%G%P%$%9$r;H$&%"%W%j%1!<%7%g%s$r5/F0$7$F(B
-$B$$$k$s$A$c$&(B?
-$B$^$:!"(Bkterm$B$J$I$G(B mpg123 $B%3%^%s%IC1FH$G2;3Z:F@8$G$-$k$+$I$&$+(B
-$B3NG'$7$F$_$l!#(B
-($B%9%Z!<%9%-!<$G%*%5%i%P(B)
+¥µ¥¦¥ó¥É¥Ç¥Ð¥¤¥¹¤¬³«¤±¤óÁÇ¡£
+¤³¤Î¥Þ¥·¥ó¤Î¥ª¡¼¥Ç¥£¥ª¥Ç¥Ð¥¤¥¹¤Ï¤Á¤ã¤ó¤ÈÀßÄê¤·¤¿¤±?
+¤¢¤È¡¢¤Û¤«¤Ë¥µ¥¦¥ó¥É¥Ç¥Ð¥¤¥¹¤ò»È¤¦¥¢¥×¥ê¥±¡¼¥·¥ç¥ó¤òµ¯Æ°¤·¤Æ
+¤¤¤ë¤ó¤Á¤ã¤¦?
+¤Þ¤º¡¢kterm¤Ê¤É¤Ç mpg123 ¥³¥Þ¥ó¥ÉÃ±ÆÈ¤Ç²»³ÚºÆÀ¸¤Ç¤­¤ë¤«¤É¤¦¤«
+³ÎÇ§¤·¤Æ¤ß¤ì¡£
+(¥¹¥Ú¡¼¥¹¥­¡¼¤Ç¥ª¥µ¥é¥Ð)
 ***********************************************************" (point)))
   
 
@@ -581,14 +627,11 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(set-process-filter proc nil)
 	(mpg123:open-error)
 	(error "bye")))
-  (if (string-match "Frame# *[0-9]+ *\\[\\([0-9]+\\]\\)" mess)
+  (if (string-match "Frame# *[0-9]+ *\\[\\([ 0-9]+\\]\\)" mess)
       (let ((f (substring mess (match-beginning 1) (match-end 1))))
 	(mpg123:set-music-info
-	 mpg123*cur-music-number 'frames (string-to-number f))))
-  (if (string-match "Frame# *[0-9]+ *\\[\\([0-9]+\\]\\)" mess)
-      (let ((f (substring mess (match-beginning 1) (match-end 1))))
-	(mpg123:set-music-info
-	 mpg123*cur-music-number 'frames (string-to-number f))))
+	 mpg123*cur-music-number 'frames
+	 (setq mpg123*cur-total-frame (string-to-number f)))))
   (if (string-match "Time: \\(..:..\\)... +\\[\\(..:..\\)" mess)
       (let ((cur (substring mess (match-beginning 1) (match-end 1)))
 	    (max (substring mess (match-beginning 2) (match-end 2))))
@@ -602,7 +645,20 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   ;  (set-buffer mpg123*info-buffer)
   ;  (insert mess))
   (and (mpg123:get-music-info mpg123*cur-music-number 'length)
+       (mpg123:get-music-info mpg123*cur-music-number 'frames)
        (set-process-filter proc 'mpg123:filter)))
+
+(defvar mpg123*window-width nil)
+(defvar mpg123*cur-total-frame nil)
+(defvar mpg123*cur-slider-column nil)
+
+;; (defun mpg123:move-slider (column)
+;;   "Move slider to COLUMN"
+;;   (let ((left (overlay-start mpg123*indicator-overlay)))
+;;     (move-overlay mpg123*slider-overlay
+;; 		  (+ left column)
+;; 		  (+ left column 1)
+;; 		  (overlay-buffer mpg123*slider-overlay))))
 
 (defun mpg123:filter (proc mess)
   (if (stringp mess)
@@ -615,9 +671,25 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		   (not mpg123*time-setting-mode)
 		   (mpg123:update-playtime (setq mpg123*cur-playtime s)))))
 	(if (string-match "Frame# +\\([0-9]+\\)" mess)
-	    (setq mpg123*cur-playframe
-		  (substring mess  (match-beginning 1) (match-end 1))))
-	)))
+	    (let (c)
+	      (setq mpg123*cur-playframe
+		    (substring mess  (match-beginning 1) (match-end 1)))
+	      (mpg123:slider-check))))))
+
+(defsubst mpg123:slider-check-1 ()
+  (let ((c (/ (* mpg123*window-width
+		 (string-to-int mpg123*cur-playframe))
+	      mpg123*cur-total-frame))
+	left)
+    (or (eq c mpg123*cur-slider-column)
+	(progn
+	  (setq left (overlay-start mpg123*indicator-overlay))
+	  (move-overlay mpg123*slider-overlay
+			(+ left c)
+			(+ left c 1)
+			(overlay-buffer mpg123*slider-overlay))))))
+
+(defsubst mpg123:null ())
 
 (defun mpg123:sentinel (proc state)
   (cond
@@ -683,21 +755,53 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (and (equal mpg123*buffer (buffer-name))
        (< (point) mpg123*end-of-list-marker)))
 
+(defun mpg123:in-indicator-p (&optional pos)
+  "Return whether the point (or POS) is in playing position indicator or not."
+  (memq mpg123*indicator-overlay (overlays-at (or pos (point)))))
+
 ;;2000/5/19
 (defvar mpg123*use-face t)
-(defvar mpg123*cur-overlay nil
-  "Overlay to indicate playing positino")
+(defvar mpg123-face-playing '("yellow" . "#004080")
+  "*Set of default playing cursor's foreground/background color.
+Set this as '(FGCOLOR . BGCOLOR)
+±éÁÕÃæ¤Î¶ÊÌ¾¤ò¼¨¤¹¥«¡¼¥½¥ë¤Î¿§¡£'(Á°·Ê¿§ . ÇØ·Ê¿§) ¤È¤¤¤¦
+¥³¥ó¥¹¥»¥ë¤Ç»ØÄê¤¹¤ë¡£XEmacs¤Ç¤Ï -nw ¤Î¤È¤­¤ËÉ½¸½¤Ç¤­¤Ê¤¤¿§¤À¤È
+¥Ç¥Õ¥©¥ë¥È¿§¤Ë¤Ê¤Ã¤Æ¤·¤Þ¤¦¤Î¤Ç¡¢¤»¤á¤ÆÁ°·Ê¿§¤Ï yellow ¤Î¤è¤¦¤Ê
+´ðËÜ8¿§¤Î°ì¤Ä¤Ë¤·¤Æ¤ª¤¯¤ÈÎÉ¤¤¡£Emacs-21 ¤Ï -nw ¤ÇÉ½¸½¤Ç¤­¤Ê¤¤¿§¤Ï
+´ðËÜ8¿§¤Î¤¦¤Á¶á¤¤¿§¤Ëmapping¤·¤Æ¤¯¤ì¤ë¤¬¤É¤®¤Ä¤¤¿§¤Ë¤Ê¤ê¤ä¤¹¤¤¤Î¤Ç
+¤Û¤É¤Û¤É¤Ë¡£")
+(defvar mpg123-face-slider '("black" . "yellow")
+  "*Set of default fgcolor/bgcolor of slider in indicator.
+±éÁÕÃæ¤Î¶Ê¤ÎÁêÂÐ°ÌÃÖ¤ò¼¨¤¹¶Ê¥ê¥¹¥È²¼Éô¤Î¥¤¥ó¥¸¥±¡¼¥¿Æâ¥¹¥é¥¤¥À¡¼¤Î¿§
+mpg123-face-playing ¤ÎDOC-STRING¤â»²¾È¤»¤è")
+
+(defvar mpg123*cur-overlay nil "Overlay to cursor of playing position")
+(defvar mpg123*slider-overlay nil "Overlay of playing position slider")
 
 (if (featurep 'xemacs) (require 'overlay))
 (if (and (fboundp 'make-face) mpg123*use-face)
     (progn
-      (make-face 'mpg123-cur-face)
-      (if (and window-system (x-display-color-p))
+      (make-face 'mpg123-face-cur)
+      (make-face 'mpg123-face-slider)
+      (if (or (and (fboundp 'display-color-p)	;Emacs-21
+		   (display-color-p))
+	      (and (fboundp 'device-class) 	;XEmacs-21
+		   (eq 'color (device-class (selected-device))))
+	      (and window-system (x-display-color-p)))
 	  (progn
-	    (set-face-background 'mpg123-cur-face "#008080")
-	    (set-face-foreground 'mpg123-cur-face "yellow"))
-	(set-face-underline-p 'mpg123-cur-face t)))
+	    (set-face-foreground 'mpg123-face-cur (car mpg123-face-playing))
+	    (set-face-background 'mpg123-face-cur (cdr mpg123-face-playing))
+	    (set-face-foreground 'mpg123-face-slider (car mpg123-face-slider))
+	    (set-face-background 'mpg123-face-slider (cdr mpg123-face-slider)))
+	(set-face-underline-p 'mpg123-face-cur t)
+	(set-face-underline-p 'mpg123-face-slider t)
+	(set-face-background 'mpg123-face-slider "white")))
   (setq mpg123*use-face nil))
+
+(defvar mpg123-need-slider mpg123*use-face
+  "*Need slider in the delimiter line which indicates playing position.
+°ìÍ÷¤Î²¼¤Î¶­³¦ÀþÎÎ°è¤Ë¡¢¸½ºß¶Ê¤Î¤ÎºÆÀ¸°ÌÃÖ¤ò¼¨¤¹¥¹¥é¥¤¥À¡¼¤¬Í×¤ë¤«¤É¤¦¤«¡£")
+
 
 (defun mpg123:play (&optional startframe)
   "Play mp3 on current line."
@@ -709,23 +813,27 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (if (and mpg123*cur-play-marker
 	   (markerp mpg123*cur-play-marker))
       (set-marker mpg123*cur-play-marker nil))
-  (and mpg123*use-face
-       mpg123*cur-overlay
-       (delete-overlay mpg123*cur-overlay))
+  (if mpg123*use-face
+      (progn
+	(setq mpg123*window-width (window-width))
+	(and mpg123*cur-overlay (delete-overlay mpg123*cur-overlay))
+	(and mpg123*slider-overlay
+	     (delete-overlay mpg123*slider-overlay))))
   (setq mpg123*cur-play-marker (point-marker))
   (skip-chars-forward " ")
   (if (or (not (looking-at "[0-9]"))
 	  (not (mpg123:in-music-list-p)))
       nil ;;if not on music line, then exit
-    (let ((last mpg123*cur-music-number) music p)
-      (setq mpg123*cur-music-number (mpg123:get-music-number))
+    (let (music p)
+      (setq mpg123*cur-music-number (mpg123:get-music-number)
+	    mpg123*cur-total-frame (mpg123:get-music-info
+				    mpg123*cur-music-number 'frames))
+
       (skip-chars-forward "^ ")
       (skip-chars-forward " ")
       (cond
        (startframe (setq mpg123*cur-start-frame startframe))
-       ((or (looking-at mpg123*default-time-string)
-	    ;;(not (equal last mpg123*cur-music-number))
-	      )
+       ((or (looking-at mpg123*default-time-string))
 	(setq mpg123*cur-start-frame "0"))
        (t
 	(let ((time (buffer-substring
@@ -740,12 +848,28 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		       music mpg123-process-coding-system *internal*)))
       (setq mpg123*time-setting-mode nil)
       (if mpg123*use-face
-	  (overlay-put (setq mpg123*cur-overlay
-			     (make-overlay
-			      (save-excursion (beginning-of-line) (point))
-			      (save-excursion (end-of-line) (point))))
-		       'face
-		       'mpg123-cur-face))
+	  (let ((frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
+		(istart (overlay-start mpg123*indicator-overlay)))
+	    (overlay-put (setq mpg123*cur-overlay
+			       (make-overlay
+				(save-excursion (beginning-of-line) (point))
+				(save-excursion (end-of-line) (point))))
+			 'face
+			 'mpg123-face-cur)
+	    (if mpg123-need-slider
+		(progn
+		  (fset 'mpg123:slider-check 'mpg123:slider-check-1)
+		  (if frames
+		      (setq istart
+			    (+ istart
+			       (/ (* (string-to-int mpg123*cur-start-frame)
+				     mpg123*window-width)
+				  frames))))
+		  (overlay-put (setq mpg123*slider-overlay
+				     (make-overlay istart (1+ istart)))
+			       'face
+			       'mpg123-face-slider))
+	      (fset 'mpg123:slider-check 'mpg123:null))))
       (set-process-filter
        (setq p (apply 'start-process "mpg123"
 		      (current-buffer)
@@ -757,7 +881,8 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 			     mpg123-command-args
 			     (list music)
 			     ))))
-       (if (mpg123:get-music-info mpg123*cur-music-number 'length)
+       (if (and (mpg123:get-music-info mpg123*cur-music-number 'length)
+		(mpg123:get-music-info mpg123*cur-music-number 'frames))
 	   'mpg123:filter
 	 'mpg123:initial-filter))
       (message "%s %s.."
@@ -775,11 +900,21 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	  (sit-for (string-to-number "0.1"))
 	(sit-for 1))
       (if (input-pending-p)
-	  (if (fboundp 'read-event) (read-event) (read-char)))	
+	  (cond
+	   ((fboundp 'read-event) (read-event))
+	   ((fboundp 'next-command-event) (next-command-event))
+	   (t (read-char))))
       (message "Waiting for process to exit..."))
     (message "")
     (if (and p (eq (process-status p) 'run))
 	(error "Cannot terminate %s process" (process-name p)))))
+
+(defun mpg123:kill-current-music (&optional proc)
+  (let ((p (or proc (get-buffer-process (current-buffer)))))
+    (and p (eq (process-status p) 'run)
+	 (progn
+	   (setq mpg123*interrupt-p t)
+	   (mpg123:sure-kill p)))))
 
 (defun mpg123-play-stop (&optional start-frame)
   "Play or Stop"
@@ -791,8 +926,8 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(progn
 	  ;(interrupt-process p)
 	  ;(sit-for 1)
-	  (setq mpg123*interrupt-p t)
-	  (mpg123:sure-kill p)
+	  ;(mpg123:sure-kill p)
+	  (mpg123:kill-current-music)
 	  (message "PAUSE!")
 	  (setq now-stopped t)))
     (if (and now-stopped
@@ -803,19 +938,61 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
       (mpg123:sure-kill p)
       (mpg123:play start-frame))))
 
-(defun mpg123-mouse-play-stop ()
+(defun mpg123-mouse-play-stop (ev)
   "Play-Stop on current music."
-  (interactive)
+  (interactive "e")
   (set-buffer mpg123*buffer)
   (if (and mpg123*cur-play-marker (markerp mpg123*cur-play-marker))
       (goto-char mpg123*cur-play-marker)
     (goto-char (point-min)))
-  (mpg123-play-stop))
+  (mpg123-play-stop)
+  (mouse-set-point ev))
+
+;;;Mouse related functions from Seiichi Namba 2000/12
+(defun mpg123-mouse-force-play (event)
+  "Immediately move to line on click EVENT, and play the file.
+Also you can hit \"^-----------\" line in *mpg123* buffer as if the
+line were a scale corresponding to the length of the current music.
+If 30% from the left was hit, the playing location jumps to that
+percentage in the length of the song etc.
+¶ÊÌ¾¤Î¤È¤³¤í¤Ë¹ç¤ï¤»¤Æ¥¯¥ê¥Ã¥¯¤¹¤ë¤È¤½¤Î¶Ê¤òÄ¾¤Á¤Ë±éÁÕ¤¹¤ë¡£
+¶Ê°ìÍ÷²¼Éô¤Î ------ ¤È¤¤¤¦¹Ô¤Ï¶ÊÁ´ÂÎ¤ÎÄ¹¤µ¤ò¼¨¤·¤Æ¤ª¤ê¡¢¤³¤³¤Ç¥¯¥ê¥Ã¥¯
+¤¹¤ë¤È¶Ê¤Î¤½¤Î°ÌÃÖ¤ËÄ¾¤Á¤Ë¥¸¥ã¥ó¥×¤¹¤ë¡£"
+  (interactive "e")
+  (mouse-set-point event)
+  (let (p)
+    (cond
+     ((mpg123:in-indicator-p)
+      (mpg123*jump-to-pos))
+     ((mpg123:in-music-list-p)
+      (mpg123:kill-current-music)
+      (mpg123-play-stop "0"))
+     (t (message "Bad bad click, brother")))))
+
+(defun mpg123*jump-to-pos ()
+  "Jump to current music's certain position according to current column."
+  (let ((p (get-buffer-process (current-buffer)))
+	(c (current-column))
+	(w (window-width))
+	frames target)
+    (if (null mpg123*cur-music-number) nil
+      (mpg123:kill-current-music)
+      (setq frames (mpg123:time2frame
+		    (mpg123:get-music-info mpg123*cur-music-number 'length))
+	    target (/ (* (string-to-int frames) c) w))
+      (message "new = %d" target)
+      (save-excursion
+	;;set buffer in my responsibility
+	(set-buffer (marker-buffer mpg123*cur-play-marker))
+	(mpg123:goto-playtime-position)
+	(mpg123:play (int-to-string target))))))
 
 (defun mpg123-play ()
   "PLAY(from the beginning of the music)."
   (interactive)
-  (mpg123-play-stop "0"))
+  (cond
+   ((mpg123:in-indicator-p) (mpg123*jump-to-pos))
+   (t (mpg123-play-stop "0"))))
 
 (defun mpg123-< (arg)
   "Rewind music by one."
@@ -830,8 +1007,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	  (progn
 	    (mpg123:update-playtime "00:00")
 	    (mpg123-prev-line arg)))
-      (setq mpg123*interrupt-p t)
-      (mpg123:sure-kill p)
+      (mpg123:kill-current-music p)
       (or mpg123-preserve-playtime (mpg123:update-playtime "00:00"))
       (mpg123:play "0")) ;play from frame#0
      ;;else go back to previous line
@@ -847,8 +1023,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
      ((and p (eq (process-status p) 'run))
       (goto-char mpg123*cur-play-marker)
       (mpg123-next-line arg)
-      (setq mpg123*interrupt-p t)
-      (mpg123:sure-kill p)
+      (mpg123:kill-current-music p)
       (mpg123:play "0")) ;play from frame#0
      ;;else go to next line
      (t
@@ -868,14 +1043,10 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 (defun mpg123-refrain ()
   "Refrain from marked position."
   (interactive)
-  (let ((frame (mpg123:get-music-info mpg123*cur-music-number 'mark))
-	(p (get-buffer-process (current-buffer))))
+  (let ((frame (mpg123:get-music-info mpg123*cur-music-number 'mark)))
     (if frame
 	(progn
-	  (if (and p (eq (process-status p) 'run))
-	      (progn
-		(setq mpg123*interrupt-p t)
-		(mpg123:sure-kill p)))
+	  (mpg123:kill-current-music)
 	  (mpg123:play
 	   (mpg123:get-music-info mpg123*cur-music-number 'mark)))
       (message "No position for refrain marked. Type `%s' to mark position"
@@ -902,7 +1073,9 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   "forw"
   (interactive "p")
   (setq mpg123*time-setting-mode t)
-  (progn ;save-excursion
+  (save-excursion
+    ;;set buffer in my responsibility
+    (set-buffer (marker-buffer mpg123*cur-play-marker))
     (mpg123:goto-playtime-position)
     (looking-at "\\([0-9]+\\):\\([0-9]+\\)/\\([0-9]+\\):\\([0-9]+\\)")
     (let*((m (string-to-int
@@ -940,10 +1113,8 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (interactive "Fmpg123 on directory or playlist: ")
   (if (not (file-exists-p dir))
       (error "Not such file or directory: %s" dir))
-  (let ((p (get-buffer-process (current-buffer))))
-    (setq mpg123*interrupt-p t)
-    (if (and p (process-status p)) (mpg123:sure-kill p))
-    (mpg123 dir)))
+  (mpg123:kill-current-music)
+  (mpg123 dir))
 
 (defun mpg123:playlist-p (file)
   "Check if FILE can be seemed to be a playlist"
@@ -1033,7 +1204,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (beginning-of-line)
   (if (mpg123:in-music-list-p)
       (let ((sb (get-buffer-create mpg123*stack-buffer))
-	    n current (stack "") buffer-read-only
+	    n current (stack "") buffer-read-only p
 	    (sw (selected-window)))
 	(save-excursion
 	  (set-buffer sb)
@@ -1053,8 +1224,11 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		(progn
 		  (set-marker mpg123*cur-play-marker nil)
 		  (setq mpg123*cur-play-marker (point-marker))
-		  (setq current nil)
-		  (insert (mpg123:format-line n)))
+		  (setq current nil p (point))
+		  (insert (mpg123:format-line n))
+		  (if (overlayp mpg123*cur-overlay)
+		      (move-overlay
+		       mpg123*cur-overlay p (point) (current-buffer))))
 	      (insert-before-markers (mpg123:format-line n))))
 	  (setq arg (1- arg)))
 	(mpg123:popup-buffer sb)
@@ -1077,7 +1251,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
   (if (mpg123:in-music-list-p)
       (let ((sb (get-buffer-create mpg123*stack-buffer))
 	    (sw (selected-window)) stackw
-	    n buffer-read-only current)
+	    n buffer-read-only current p)
 	(beginning-of-line)
 	(mpg123:popup-buffer sb)
 	(setq stackw (selected-window))
@@ -1095,8 +1269,11 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		(progn
 		  (set-marker mpg123*cur-play-marker nil)
 		  (setq mpg123*cur-play-marker (point-marker))
-		  (setq current nil)
-		  (insert (mpg123:format-line n)))
+		  (setq current nil p (point))
+		  (insert (mpg123:format-line n))
+		  (if (overlayp mpg123*cur-overlay)
+		      (move-overlay
+		       mpg123*cur-overlay p (point) (current-buffer))))
 	      (insert-before-markers (mpg123:format-line n))))
 	  (setq arg (1- arg)))
 	(if (progn (set-buffer sb)
@@ -1187,7 +1364,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
      (t
       (message "Canceled")))))
 
-(defun mpg123-quit ()
+(defun mpg123-quit (&optional yes)
   "Quit"
   (interactive)
   (let ((p (get-buffer-process (current-buffer)))
@@ -1195,12 +1372,17 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 		  " *mpg123tmp* " " *mpg123 tag tmp*" " *mpg123 mixer* ")))
     (if (and p
 	     (eq (process-status p) 'run)
-	     (y-or-n-p "Kill current music?"))
+	     (or yes (y-or-n-p "Kill current music?")))
 	(mpg123:sure-kill p)
       (setq buffers (delete mpg123*buffer buffers))
       (switch-to-buffer (get-buffer-create mpg123*initial-buffer)))
     (setq mpg123*interrupt-p 'quit)
     (mapcar '(lambda (b) (and (get-buffer b) (kill-buffer b))) buffers)))
+
+(defun mpg123-quit-yes ()
+  "Force to quit"
+  (interactive)
+  (mpg123-quit t))
 
 (defun mpg123:mp3-files-in-dir (dir)
   "Return mp3 files in a directory"
@@ -1261,7 +1443,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
       (while (search-forward "\0" nil t)
 	(replace-match "")))
     (save-excursion
-      (while (search-forward "$B!!(B" nil t) (replace-match " ")))
+      (while (search-forward "¡¡" nil t) (replace-match " ")))
     (save-excursion
       (while (re-search-forward "\\s \\s +" nil t)
       (replace-match " ")))
@@ -1328,7 +1510,14 @@ mpg123:
 \\[mpg123-kill-line]	Kill music line and push onto stack
 \\[mpg123-yank-line]	Yank music line from stack
 \\[mpg123-quit]	Quit
-0..9	Digit argument (ex. 50V increase volume by 50step)
+\\[mpg123-quit-yes]	Quit without query
+\\[mpg123-mouse-force-play]	Select a music directly on the mouse cursor
+0..9	Digit argument (ex. 50V increase volume by 50steps)
+----
+The delimiter line \"-------\" is the indicator of currently playing position.
+You may see the slider on the line running from left to right while the
+music's going ahead.  If you hit \\[mpg123-play] or \\[mpg123-mouse-force-play] on the indicator line,
+the music will immediately move to that position.
 "
 ))))
 
@@ -1352,6 +1541,8 @@ mpg123:
 	mpg123*cur-start-frame "0"
 	mpg123*cur-playframe nil)
   (use-local-map mpg123-mode-map))
+
+(defvar mpg123*indicator-overlay nil)
 
 (defun mpg123:create-buffer (files)
   "Create play-buffer"
@@ -1380,7 +1571,21 @@ mpg123:
   (if (markerp mpg123*end-of-list-marker)
       (set-marker mpg123*end-of-list-marker nil))
   (setq mpg123*end-of-list-marker (point-marker))
-  (insert-char ?- (1- (window-width)))
+  (if (overlayp mpg123*indicator-overlay)
+      (delete-overlay mpg123*indicator-overlay))
+  (setq mpg123*indicator-overlay
+	(make-overlay
+	 (point)
+	 (progn
+	   (if mpg123-need-slider
+	       (progn
+		 (insert "0%")	;2columns
+		 (insert-char ?- (/ (- (window-width) 9) 2))
+		 (insert "50%")	;3columns
+		 (insert-char ?- (- (window-width) (current-column) 5))
+		 (insert "100%"))	;4columns
+	     (insert-char ?- (1- (window-width))))
+	   (point))))
   (insert "\nVolume: [")
   (if (markerp mpg123*volume-marker)
       (set-marker mpg123*volume-marker nil))
@@ -1487,9 +1692,9 @@ mpg123:
 	      vol)
 	  (set-buffer b)
 	  (erase-buffer)
-	  (call-process mpg123-mixer-command nil b nil "-v" "q")
+	  (call-process mpg123-mixer-command nil b nil "-w" "q")
 	  (goto-char (point-min))
-	  (if (re-search-forward "vol *\\([0-9]+\\), *\\([0-9]+\\)" nil t)
+	  (if (re-search-forward "pcm *\\([0-9]+\\), *\\([0-9]+\\)" nil t)
 	      (let ((left (buffer-substring
 			   (match-beginning 1) (match-end 1)))
 		    (right (buffer-substring
@@ -1595,4 +1800,5 @@ mpg123:
 ; fill-prefix: ";;	" 
 ; paragraph-start: "^$\\|\\|;;$" 
 ; paragraph-separate: "^$\\|\\|;;$" 
+; buffer-file-coding-system: euc-jp
 ; End: 
