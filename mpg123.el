@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon Apr  8 12:50:01 2002 on firestorm
-;;; Update count: 864
+;;; Last modified Fri Sep 13 21:19:52 2002 on firestorm
+;;; Update count: 885
 
 ;;[News]
 ;;	Key binding to Delete-file is changed from `C-d' to `D'.
@@ -251,6 +251,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.27  2002/09/14 12:55:52  yuuji
+;; B/b rewind to the previous music if it reaches at the beginning of the music.
+;;
 ;; Revision 1.26  2002/04/08 03:57:25  yuuji
 ;; IRIX 6.3 OK
 ;;
@@ -558,7 +561,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
   (goto-char mpg123*cur-play-marker)
   (skip-chars-forward "^:")
   (forward-char -2))
-; (defmacro mpg123:goto-playtime-position ()
+; p(defmacro mpg123:goto-playtime-position ()
 ;   (list 'progn
 ; 	(list 'goto-char 'mpg123*cur-play-marker)
 ; 	;(list 'move-to-column 3)
@@ -566,12 +569,12 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 ; 	(list 'forward-char -2)
 ; 	))
 
-(defsubst mpg123:update-playtime (timestr)
+(defsubst mpg123:update-playtime (timestr &optional here)
   "Update playing time string"
   (save-excursion
     (set-buffer (marker-buffer mpg123*cur-play-marker))
     (let (buffer-read-only)
-      (mpg123:goto-playtime-position)
+      (or here (mpg123:goto-playtime-position))
       (delete-char 5)
       (insert timestr))))
 
@@ -1138,26 +1141,48 @@ percentage in the length of the song etc.
 (defun mpg123-forward (arg)
   "forw"
   (interactive "p")
-  (setq mpg123*time-setting-mode t)
-  (save-excursion
+  (let ()
     ;;set buffer in my responsibility
     (set-buffer (marker-buffer mpg123*cur-play-marker))
-    (mpg123:goto-playtime-position)
-    (looking-at "\\([0-9]+\\):\\([0-9]+\\)/\\([0-9]+\\):\\([0-9]+\\)")
-    (let*((m (string-to-int
-	      (buffer-substring (match-beginning 1) (match-end 1))))
-	  (s (string-to-int
-	      (buffer-substring (match-beginning 2) (match-end 2))))
-	  time M S T)
-      (if (and (match-beginning 3) (match-beginning 4))
+    (if mpg123*time-setting-mode
+	(progn
+	  (beginning-of-line)
+	  (skip-chars-forward "^:")
+	  (forward-char -2))
+      (setq mpg123*time-setting-mode t)
+      (mpg123:goto-playtime-position))
+    (if (and (looking-at "\\([0-9]+\\):\\([0-9]+\\)/\\([0-9]+\\):\\([0-9]+\\)")
+	     (match-beginning 3)
+	     (match-beginning 4))
+	(let*((m (string-to-int
+		  (buffer-substring (match-beginning 1) (match-end 1))))
+	      (s (string-to-int
+		  (buffer-substring (match-beginning 2) (match-end 2))))
+	      (n (mpg123:get-music-number))
+	      (c (current-column))
+	      time M S T)
 	  (setq M (string-to-int
-		   (buffer-substring (match-beginning 3) (match-end 3)))
-		S (string-to-int
-		   (buffer-substring (match-beginning 4) (match-end 4)))
-		T (+ (* 60 M) S)))
-      (setq time (mpg123:add-time m s arg T))
-      (mpg123:update-playtime (format "%02d:%02d" (car time) (cdr time)))
-      (message "Time Slide mode: Type `SPC' to play in that position"))))
+		       (buffer-substring (match-beginning 3) (match-end 3)))
+		    S (string-to-int
+		       (buffer-substring (match-beginning 4) (match-end 4)))
+		    T (+ (* 60 M) S))
+	  (if (and (= m 0) (= s 0) (< arg 0)
+		   ;;Already rewind to 00:00 and arg is negative
+		   (progn (mpg123-next-line -1)
+			  (/= n (mpg123:get-music-number))))
+	      (let*((prevnum (mpg123:get-music-number))
+		    (len (mpg123:get-music-info prevnum 'length)))
+		(if len
+		    (progn		;set playtime to maxlength
+		      (move-to-column c)
+		      (mpg123:update-playtime len 'here)))
+		(mpg123-forward arg))
+	    (setq time (mpg123:add-time m s arg T))
+	    (move-to-column c)
+	    (mpg123:update-playtime
+	     (format "%02d:%02d" (car time) (cdr time)) 'here)
+	    (message "Time Slide mode: Type `SPC' to play in that position")))
+      (message "Length not known.  Play this music once please."))))
 
 (defun mpg123-backward (arg)
   "Rew"
@@ -1268,11 +1293,15 @@ percentage in the length of the song etc.
 (defun mpg123:get-music-number ()
   "Get current line's music number."
   (save-excursion
-    (beginning-of-line)
-    (skip-chars-forward " \t" nil)
-    (and
-     (looking-at "[0-9]+")
-     (string-to-int (buffer-substring (match-beginning 0) (match-end 0))))))
+    (let ((md (match-data)))
+      (beginning-of-line)
+      (skip-chars-forward " \t" nil)
+      (unwind-protect
+	  (and
+	   (looking-at "[0-9]+")
+	   (string-to-int
+	    (buffer-substring (match-beginning 0) (match-end 0))))
+	(store-match-data md)))))
 
 (defvar mpg123-popup-window-height 8)
 (defun mpg123:popup-buffer (buffer)
