@@ -1,21 +1,21 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123
-;;; (c)1999 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999,2000 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Sep 25 16:05:26 1999 on firestorm
-;;; Update count: 526
+;;; Last modified Wed Feb  9 13:12:21 2000 on hornet
+;;; Update count: 536
 
 ;;[Commentary]
 ;;	
 ;;	This package is a front-end program to mpg123 audio player.
-;;	mpg123¤ÎºÆÀ¸¥Õ¥í¥ó¥È¥¨¥ó¥É¤Ç¤¹¡£
+;;	mpg123$B$N:F@8%U%m%s%H%(%s%I$G$9!#(B
 ;;	
 ;;[Requirement]
 ;;	
 ;;	The `mpg123' program version 0.59q and enough CPU power to run
 ;;	it.
-;;	mpg123 0.59q¤È¤½¤ì¤òÁö¤é¤¹¤Î¤Ë½½Ê¬¤ÊCPU¥Ñ¥ï¡¼¡£
-;;	ºÇÄã¤Ç¤âMMX??
+;;	mpg123 0.59q$B$H$=$l$rAv$i$9$N$K==J,$J(BCPU$B%Q%o!<!#(B
+;;	$B:GDc$G$b(BMMX??
 ;;	
 ;;[Installation]
 ;;	
@@ -28,12 +28,12 @@
 ;;	  [~/.emacs]
 ;;		(autoload 'mpg123 "mpg123" "A Front-end to mpg123" t)
 ;;	
-;;	¤Þ¤º¡¢mpg123¤ÎÀµ¾ïÆ°ºî¤ò³ÎÇ§¤·¤Æ¤«¤é¾å¤Î¹Ô¤ò~/.emacs¤ËÄÉ²Ã¤·¤Þ¤¹¡£
-;;	¤Ê¤ªmpg123¤Ï0.59q°Ê¾å¤Ç¤Ê¤¤¤ÈÀµ¾ï¤ËÆ°ºî¤·¤Ê¤¤²ÄÇ½À­¤¬¤¢¤ê¤Þ¤¹(¤â¤Ã
-;;	¤È¿·¤·¤¤¤Î¤¬½Ð¤¿¤é¤Þ¤¿²ø¤·¤¤¤«¤â¤·¤ì¤ó¡Ä)¡£mpg123 ¤Ë -v ¥ª¥×¥·¥ç
-;;	¥ó¤ò¤Ä¤±¤Æµ¯Æ°¤·²»³Ú¤ÎºÆÀ¸¤È¤È¤â¤Ë¥Ç¥³¡¼¥ÉÃæ¤Î¥Õ¥ì¡¼¥àÈÖ¹æ¤¬²èÌÌ
-;;	¤ËÉ½¼¨¤µ¤ì¤ë¤«¤É¤¦¤«³ÎÇ§¤·¤Æ¤¯¤À¤µ¤¤¡£¤³¤ì¤¬¤¦¤Þ¤¯¹Ô¤«¤Ê¤¤¤È¤³¤Î
-;;	¥×¥í¥°¥é¥à¤â¤¦¤Þ¤¯Æ°¤­¤Þ¤»¤ó¡£
+;;	$B$^$:!"(Bmpg123$B$N@5>oF0:n$r3NG'$7$F$+$i>e$N9T$r(B~/.emacs$B$KDI2C$7$^$9!#(B
+;;	$B$J$*(Bmpg123$B$O(B0.59q$B0J>e$G$J$$$H@5>o$KF0:n$7$J$$2DG=@-$,$"$j$^$9(B($B$b$C(B
+;;	$B$H?7$7$$$N$,=P$?$i$^$?2x$7$$$+$b$7$l$s!D(B)$B!#(Bmpg123 $B$K(B -v $B%*%W%7%g(B
+;;	$B%s$r$D$1$F5/F0$72;3Z$N:F@8$H$H$b$K%G%3!<%ICf$N%U%l!<%`HV9f$,2hLL(B
+;;	$B$KI=<($5$l$k$+$I$&$+3NG'$7$F$/$@$5$$!#$3$l$,$&$^$/9T$+$J$$$H$3$N(B
+;;	$B%W%m%0%i%`$b$&$^$/F0$-$^$;$s!#(B
 ;;	
 ;;[How to Play the music]
 ;;	
@@ -49,19 +49,19 @@
 ;;	start the  music.  All key bindings  are shown at  the bottom of
 ;;	music list buffer.  Please take a look at it.
 ;;	
-;;	´û¤Ë MPEG1 audio Layer I/II/III ¥Õ¥¡¥¤¥ë¤Ï»ý¤Ã¤Æ¤ë¤â¤Î¤È¤·¤ÆÀâÌÀ
-;;	¤·¤Þ¤¹(¤¿¤Ö¤ó¤¤¤ï¤æ¤ëMP3¤·¤«»ý¤Ã¤Æ¤Ê¤¤¤È»×¤¦¤±¤Éµ¤¤Ë¤·¤Ê¤¤¤ï¤·¤â
-;;	Layer2¤È3¤Ïºî¤Ã¤¿¤³¤È¤¹¤é¤Ê¤¤)¡£¤Ç¡¢¤½¤Î¥Õ¥¡¥¤¥ë¤Ï¤­¤Ã¤È¤É¤³¤«¤Î
-;;	¥Ç¥£¥ì¥¯¥È¥ê¤ËÀ°Íý¤·¤Æ¤ª¤¤¤Æ¤¢¤ë¤È»×¤¦¤Î¤Ç¡¢²»³Ú¤òÊ¹¤­¤¿¤¯¤Ê¤Ã¤¿
-;;	¤é¡¢¤Þ¤ºEmacs¤òµ¯Æ°¤·¡¢
+;;	$B4{$K(B MPEG1 audio Layer I/II/III $B%U%!%$%k$O;}$C$F$k$b$N$H$7$F@bL@(B
+;;	$B$7$^$9(B($B$?$V$s$$$o$f$k(BMP3$B$7$+;}$C$F$J$$$H;W$&$1$I5$$K$7$J$$$o$7$b(B
+;;	Layer2$B$H(B3$B$O:n$C$?$3$H$9$i$J$$(B)$B!#$G!"$=$N%U%!%$%k$O$-$C$H$I$3$+$N(B
+;;	$B%G%#%l%/%H%j$K@0M}$7$F$*$$$F$"$k$H;W$&$N$G!"2;3Z$rJ9$-$?$/$J$C$?(B
+;;	$B$i!"$^$:(BEmacs$B$r5/F0$7!"(B
 ;;	
-;;		M-x mpg123 ¤Ú¤·
-;;		¥Ç¥£¥ì¥¯¥È¥êÌ¾ ¤Ú¤·
+;;		M-x mpg123 $B$Z$7(B
+;;		$B%G%#%l%/%H%jL>(B $B$Z$7(B
 ;;	
-;;	¤ÈÂÇ¤Á¤Þ¤¹¡£¤È¡¢¤½¤Î¥Ç¥£¥ì¥¯¥È¥ê¤Ë¤¢¤ë²»³Ú¥Õ¥¡¥¤¥ë°ìÍ÷¤¬½Ð¤ÆÍè¤ë
-;;	¤Î¤Ç¡¢Ê¹¤­¤¿¤¤¶Ê¤Ë¹ç¤ï¤»¤ÆSPC¤òÂÇ¤Ä¤È±éÁÕ¤¬»Ï¤Þ¤ê¤Þ¤¹¡£¤½¤ÎÂ¾¤Î
-;;	¥­¡¼¥³¥Þ¥ó¥É¤Ï²»³Ú°ìÍ÷¥Ð¥Ã¥Õ¥¡¤ÎËöÈø¤ËÉ½¼¨¤µ¤ì¤Æ¤¤¤ë¤Î¤Ç¤½¤Ã¤Á¤ò
-;;	¸«¤Æ¤¯¤À¤µ¤¤¡£
+;;	$B$HBG$A$^$9!#$H!"$=$N%G%#%l%/%H%j$K$"$k2;3Z%U%!%$%k0lMw$,=P$FMh$k(B
+;;	$B$N$G!"J9$-$?$$6J$K9g$o$;$F(BSPC$B$rBG$D$H1iAU$,;O$^$j$^$9!#$=$NB>$N(B
+;;	$B%-!<%3%^%s%I$O2;3Z0lMw%P%C%U%!$NKvHx$KI=<($5$l$F$$$k$N$G$=$C$A$r(B
+;;	$B8+$F$/$@$5$$!#(B
 ;;	
 ;;	
 ;;[Configuration]
@@ -84,11 +84,11 @@
 ;;				Initialize sound volume with this value.
 ;;	
 ;;	
-;;	¤Û¤Ü mpg123 0.59q ¤Ë·è¤áÂÇ¤Á¤È¤¤¤¦É÷¾ð¤Ê¤Î¤Ç¡¢¤¢¤Þ¤ê¤¤¤¸¤ì¤ë¤È¤³
-;;	¤íÌµ¤¤¤±¤É¡¢¾å¤Ë½ñ¤¤¤Æ¤¢¤ëÊÑ¿ô¤¬¤¤¤¸¤ì¤Þ¤¹¡£
-;;	¥ï¥¿¥·Linux¥ï¥Ã¥«¥ê¥Þ¥»¡Á¥ó! ¤Û¤È¤ó¤É¤ÎLinux¤ÇÄÌÍÑ¤¹¤ë²»ÎÌÄ´Àá¥³
-;;	¥Þ¥ó¥É¤¬¤¢¤Ã¤¿¤é¶µ¤¨¤Æ¤¯¤À¤µ¤¤¤Ê¡£
-;;	aumix -v ¡ÖÉ´Ê¬Î¨¡×¤Ç¤¨¤¨¤Î?
+;;	$B$[$\(B mpg123 0.59q $B$K7h$aBG$A$H$$$&Iw>p$J$N$G!"$"$^$j$$$8$l$k$H$3(B
+;;	$B$mL5$$$1$I!">e$K=q$$$F$"$kJQ?t$,$$$8$l$^$9!#(B
+;;	$B%o%?%7(BLinux$B%o%C%+%j%^%;!A%s(B! $B$[$H$s$I$N(BLinux$B$GDLMQ$9$k2;NLD4@a%3(B
+;;	$B%^%s%I$,$"$C$?$i65$($F$/$@$5$$$J!#(B
+;;	aumix -v $B!VI4J,N(!W$G$($($N(B?
 ;;	
 ;;[More comfortable]
 ;;	
@@ -99,14 +99,14 @@
 ;;	windows.el - The Window Manager for Emacs - which can be
 ;;	obtained from http://www.gentei.org/~yuuji/software/.
 ;;	
-;;	Emacs»È¤Ã¤Æ¤ë¤ó¤À¤«¤éÊ¹¤¯¤Ð¤Ã¤«¤ê¤¸¤ã¤Ê¤¯¤ÆÊÔ½¸¤·¤Ê¤µ¤¤!  ¤Æ¤³¤È
-;;	¤Ç¡¢Á´¥Õ¥ì¡¼¥à¤ò¾ÃÈñ¤¹¤ëmpg123.el¤òÁÇ¤ÎEmacs¤Ç»È¤Ã¤Æ¤¿¤éÂçÊÑ¡£¤¿
-;;	¤á¤·¤Ë windows.el ¤È°ì½ï¤Ë¤Ä¤³¤Æ¤ß¤Æ¤Í¡£¥Õ¥ì¡¼¥à¤ò»È¤Ã¤Æ¤ë¤È¤­¤Ï
-;;	ÊÌ¥Õ¥ì¡¼¥à¤Ç¥Ð¥Ã¥¯¥°¥é¥¦¥ó¥ÉºÆÀ¸¡¢-nw ¤Çµ¯Æ°¤·¤Æ¤¤¤ë¤È¤­¤ÏÎ¢¥¦¥£
-;;	¥ó¥É¥¦¤Ç¥Ð¥Ã¥¯¥°¥é¥¦¥ó¥ÉºÆÀ¸¤Ç¤­¤Æ¡¢¤½¤ÎÎ¢¥¦¥£¥ó¥É¥¦¤È¤¤¤¯¤Ä¤«¤Î
-;;	ÊÔ½¸¥¦¥£¥ó¥É¥¦¤òÀÚÂØ¤¨¤Æ»È¤¦¤Ê¤ó¤Æ»ö¤â²ÄÇ½¡£¤â¤Á¤í¤ó¤³¤ÎÊ¸¾Ï¤âÎ¢
-;;	¤ËÈ¾Ê¬±£¤ì¤Æ¤ë¥Õ¥ì¡¼¥à¤Çmpg123¤òÁö¤é¤»¤Ê¤¬¤é½ñ¤¤¤Æ¤Þ¤¹¡£
-;;	windows.el ¤Ï http://www.gentei.org/~yuuji/software/ ¤«¤é¤É¤¦¤¾¡£
+;;	Emacs$B;H$C$F$k$s$@$+$iJ9$/$P$C$+$j$8$c$J$/$FJT=8$7$J$5$$(B!  $B$F$3$H(B
+;;	$B$G!"A4%U%l!<%`$r>CHq$9$k(Bmpg123.el$B$rAG$N(BEmacs$B$G;H$C$F$?$iBgJQ!#$?(B
+;;	$B$a$7$K(B windows.el $B$H0l=o$K$D$3$F$_$F$M!#%U%l!<%`$r;H$C$F$k$H$-$O(B
+;;	$BJL%U%l!<%`$G%P%C%/%0%i%&%s%I:F@8!"(B-nw $B$G5/F0$7$F$$$k$H$-$ON"%&%#(B
+;;	$B%s%I%&$G%P%C%/%0%i%&%s%I:F@8$G$-$F!"$=$NN"%&%#%s%I%&$H$$$/$D$+$N(B
+;;	$BJT=8%&%#%s%I%&$r@ZBX$($F;H$&$J$s$F;v$b2DG=!#$b$A$m$s$3$NJ8>O$bN"(B
+;;	$B$KH>J,1#$l$F$k%U%l!<%`$G(Bmpg123$B$rAv$i$;$J$,$i=q$$$F$^$9!#(B
+;;	windows.el $B$O(B http://www.gentei.org/~yuuji/software/ $B$+$i$I$&$>!#(B
 ;;	
 ;;[Bugs]
 ;;	
@@ -115,14 +115,14 @@
 ;;	such case, mpg123.el cannot  detect that condition.  If you come
 ;;	to see such behavior, please pause and restart player by SPC key.
 ;;	
-;;	¤¿¤Þ¤Ëmpg123¤¬Æ°¤¤¤Æ¤Ï¤¤¤ë¤â¤Î¤Î²»¤ò½Ð¤µ¤Ê¤¯¤Ê¤Ã¤Æ¤·¤Þ¤¦¤³¤È¤¬¤¢
-;;	¤ê¤Þ¤¹¡£¤½¤Î¤è¤¦¤ÊµóÆ°¤òmpg123.el¤Ï¸¡½Ð¤Ç¤­¤Ê¤¤¤Î¤Ç¡¢¤½¤¦¤Ê¤Ã¤¿
-;;	¤éSPC¤Ç°ìÃ¶»ß¤á¤ÆÆ°¤«¤·Ä¾¤·¤Æ¤¯¤À¤µ¤¤¡£Emacs19¥Ù¡¼¥¹¤ÎMule¤Ç¤ÏÊ£
-;;	»¨¤ÊÍýÍ³¤Ë¤è¤êÊÌ¥Õ¥ì¡¼¥à¤Ç±éÁÕÃæ¤Ë¼¡¤Î¶Ê¤Ë¿Ê¤à¤È¡¢¼¡¤Î¶Ê¤Ë°Ü¤Ã¤¿
-;;	Ä¾¸å¤Î¥­¡¼¤ò±éÁÕÍÑ¥Ð¥Ã¥Õ¥¡¤Ë¼è¤é¤ì¤Æ¤·¤Þ¤¤¡¢¤Ê¤ª¤«¤Ä±éÁÕ»þ´Ö¤Î¹¹
-;;	¿·¤¬(¤ß¤«¤±¾å)¼¡¤Ë¥­¡¼ÆþÎÏ¤¹¤ë¤Þ¤Ç»ß¤Þ¤Ã¤Æ¤·¤Þ¤¤¤Þ¤¹¡£¤½¤¦¤Ê¤Ã¤Æ
-;;	¤·¤Þ¤¦³ÎÎ¨¤¬²¼¤¬¤ë¤è¤¦¤Ê¹©É×¤Ï¤·¤Æ¤ß¤Þ¤·¤¿¤¬º¬ËÜÅª²ò·è¤Ë¤Ï»ê¤ê¤Þ
-;;	¤»¤ó¤Ç¤·¤¿¡£
+;;	$B$?$^$K(Bmpg123$B$,F0$$$F$O$$$k$b$N$N2;$r=P$5$J$/$J$C$F$7$^$&$3$H$,$"(B
+;;	$B$j$^$9!#$=$N$h$&$J5sF0$r(Bmpg123.el$B$O8!=P$G$-$J$$$N$G!"$=$&$J$C$?(B
+;;	$B$i(BSPC$B$G0lC6;_$a$FF0$+$7D>$7$F$/$@$5$$!#(BEmacs19$B%Y!<%9$N(BMule$B$G$OJ#(B
+;;	$B;($JM}M3$K$h$jJL%U%l!<%`$G1iAUCf$K<!$N6J$K?J$`$H!"<!$N6J$K0\$C$?(B
+;;	$BD>8e$N%-!<$r1iAUMQ%P%C%U%!$K<h$i$l$F$7$^$$!"$J$*$+$D1iAU;~4V$N99(B
+;;	$B?7$,(B($B$_$+$1>e(B)$B<!$K%-!<F~NO$9$k$^$G;_$^$C$F$7$^$$$^$9!#$=$&$J$C$F(B
+;;	$B$7$^$&3NN($,2<$,$k$h$&$J9)IW$O$7$F$_$^$7$?$,:,K\E*2r7h$K$O;j$j$^(B
+;;	$B$;$s$G$7$?!#(B
 ;;	
 ;;[No Warranty]
 ;;	
@@ -134,12 +134,12 @@
 ;;	easy to write me comments, bug-reports.
 ;;							yuuji@gentei.org
 ;;	
-;;	¤³¤Î¥×¥í¥°¥é¥à¤Ï¥Õ¥ê¡¼¥½¥Õ¥È¥¦¥§¥¢¤È¤·¤ÆÇÛÉÛ¤·¤Þ¤¹¡£¤³¤Î¥×¥í¥°¥é
-;;	¥à¤ÎÍøÍÑ¤Ë¤è¤Ã¤ÆÀ¸¤¸¤¿¤¤¤«¤Ê¤ë·ë²Ì¤ËÂÐ¤·¤Æ¤âºî¼Ô¤ÏÀÕÇ¤¤òÉé¤¤¤Þ¤»
-;;	¤ó¡£¥³¥á¥ó¥È¤ä¥Ð¥°¥ì¥Ý¡¼¥È¤Ï¤ª¤ª¤¤¤Ë´¿·Þ¤·¤Þ¤¹¤Î¤Ç¸æµ¤·Ú¤Ë¸æÏ¢Íí
-;;	¤¯¤À¤µ¤¤¡£¤Þ¤¿¥×¥í¥°¥é¥à¤ËÂÐ¤¹¤ë¸Ä¿ÍÅª¤Ê½¤Àµ¤Ï¼«Í³¤Ë¤·¤ÆÄº¤¤¤Æ¹½
-;;	¤¤¤Þ¤»¤ó¤¬¡¢¤½¤ì¤ò¸ø³«¤·¤¿¤¤¾ì¹ç¤Ï»ä¤Þ¤Ç¸æÏ¢Íí¤¯¤À¤µ¤¤¡£Ï¢Íí¤Ï°Ê
-;;	²¼¤Î¥¢¥É¥ì¥¹¤Þ¤Ç¤ª´ê¤¤¤·¤Þ¤¹(1999/6¸½ºß)¡£
+;;	$B$3$N%W%m%0%i%`$O%U%j!<%=%U%H%&%'%"$H$7$FG[I[$7$^$9!#$3$N%W%m%0%i(B
+;;	$B%`$NMxMQ$K$h$C$F@8$8$?$$$+$J$k7k2L$KBP$7$F$b:n<T$O@UG$$rIi$$$^$;(B
+;;	$B$s!#%3%a%s%H$d%P%0%l%]!<%H$O$*$*$$$K4?7^$7$^$9$N$G8f5$7Z$K8fO"Mm(B
+;;	$B$/$@$5$$!#$^$?%W%m%0%i%`$KBP$9$k8D?ME*$J=$@5$O<+M3$K$7$FD:$$$F9=(B
+;;	$B$$$^$;$s$,!"$=$l$r8x3+$7$?$$>l9g$O;d$^$G8fO"Mm$/$@$5$$!#O"Mm$O0J(B
+;;	$B2<$N%"%I%l%9$^$G$*4j$$$7$^$9(B(1999/6$B8=:_(B)$B!#(B
 ;;							yuuji@gentei.org
 ;;[Acknowledgement]
 ;;	
@@ -154,6 +154,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.8  2000/02/09 04:15:31  yuuji
+;; Fix for mule2 (mpg123:sound-p).
+;;
 ;; Revision 1.7  1999/09/25 07:09:44  yuuji
 ;; mpg123-delete-file can delete music only from the list, not on the disk.
 ;; Shuffle after mpg123-delete-file now works correctly.
@@ -163,10 +166,10 @@
 ;; defmacro changed to defsubst
 ;;
 ;; Revision 1.5  1999/07/24 03:58:52  yuuji
-;; mule2¤Ç¤Ê¤ë¤Ù¤¯¶ÊÏ¢·¸¤¬ÅÓÀÚ¤ì¤Ê¤¤¤è¤¦¤Ë¹©É×(´°àú¤Ç¤Ï¤Ê¤¤)¡£
+;; mule2$B$G$J$k$Y$/6JO"78$,ES@Z$l$J$$$h$&$K9)IW(B($B40`z$G$O$J$$(B)$B!#(B
 ;;
 ;; Revision 1.4  1999/07/05 09:00:19  yuuji
-;; ÆüËÜ¸ì¥Õ¥¡¥¤¥ëÌ¾ÂÐ±þ(¤¿¤Ö¤ó)
+;; $BF|K\8l%U%!%$%kL>BP1~(B($B$?$V$s(B)
 ;; \C-d (mpg123-delete-file)
 ;;
 
@@ -176,34 +179,35 @@
    ((string-match "netbsd" (emacs-version))	'netbsd)  ;not yet
    ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet
    ((string-match "linux" (emacs-version))	'linux)   ;not yet maybe
+   ((string-match "nt4" (emacs-version))	'nt)
    ((string-match "solaris" (emacs-version))	'solaris)))
 
 (defvar mpg123-command "mpg123"
   "*Command name of mpg123 player. Need 0.59q or later.
-mpg123¤Î¥³¥Þ¥ó¥ÉÌ¾¡£0.59q¤¬É¬Í×¡£")
+mpg123$B$N%3%^%s%IL>!#(B0.59q$B$,I,MW!#(B")
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
 	     '((freebsd . "mixer") (linux . "aumix")
-	       (solaris . "audioctl"))))
+	       (solaris . "audioctl") (nt . "mixer.exe"))))
   "*Command name for mixer setting utility
-mixerÄ´ÀáÍÑ¥³¥Þ¥ó¥É")
+mixer$BD4@aMQ%3%^%s%I(B")
 (defvar mpg123-mixer-setvol-target-list
   (cdr (assq mpg123-system-type
 	     '((freebsd . ("vol" "pcm")) (linux . ("-v"))
-	       (solaris . ("-v")))))
+	       (solaris . ("-v")) (nt . ("-v")))))
   "*Option list for volume setting utility.
-mixerÄ´Àá¥³¥Þ¥ó¥É¤Î²»ÎÌÄ´Àá¥ª¥×¥·¥ç¥ó¤Î¥ê¥¹¥È")
+mixer$BD4@a%3%^%s%I$N2;NLD4@a%*%W%7%g%s$N%j%9%H(B")
 (defvar mpg123-preserve-playtime t
   "When shift to other music, leave playing time of current music, or not")
 (defvar mpg123-id3-tag-function 'mpg123:peek-tag
   "*Emacs-Lisp function for extracting ID3 tag.
-MP3¤«¤éID3¤ò¼èÆÀ¤¹¤ë¤¿¤á¤Î´Ø¿ô")
+MP3$B$+$i(BID3$B$r<hF@$9$k$?$a$N4X?t(B")
 (defvar mpg123-startup-volume 30
   "*Default sound volume at startup of this program.
-mpg123.el½é²óµ¯Æ°»þ¤Î²»ÎÌ¤Î¥Ç¥Õ¥©¥ë¥ÈÃÍ.")
+mpg123.el$B=i2s5/F0;~$N2;NL$N%G%U%)%k%HCM(B.")
 (defvar mpg123-default-repeat 0
   "*Default number of repetition of through playing.
-ºÆÀ¸¤Î¥Ç¥Õ¥©¥ë¥È¤Î¥ê¥Ô¡¼¥È²ó¿ô")
+$B:F@8$N%G%U%)%k%H$N%j%T!<%H2s?t(B")
 (defvar mpg123-process-coding-system
   (cond ((and (fboundp 'modify-coding-system-alist)
 	      (intern-soft "euc-jp"))
@@ -211,13 +215,13 @@ mpg123.el½é²óµ¯Æ°»þ¤Î²»ÎÌ¤Î¥Ç¥Õ¥©¥ë¥ÈÃÍ.")
 	((boundp '*euc-japan*) *euc-japan*)
 	nil)
   "*Default process coding system for mpg123.
-mpg123¥³¥Þ¥ó¥ÉÍÑ¤Î´Á»ú¥³¡¼¥É¡£´Á»ú¥Õ¥¡¥¤¥ëÌ¾¤¬¤¢¤ë¤È¤­¤ÏÉ¬¿Ü")
+mpg123$B%3%^%s%IMQ$N4A;z%3!<%I!#4A;z%U%!%$%kL>$,$"$k$H$-$OI,?\(B")
 (defvar mpg123-omit-id3-artist nil
   "*Non-nil for omitting artist name display of ID3 tag.
-non-nil¤Î¤È¤­ID3¥¿¥°¤«¤é¤Î¥¢¡¼¥Á¥¹¥ÈÌ¾É½¼¨¤ò¾ÊÎ¬¤¹¤ë¡£")
+non-nil$B$N$H$-(BID3$B%?%0$+$i$N%"!<%A%9%HL>I=<($r>JN,$9$k!#(B")
 (defvar mpg123-mp3-scan-bytes 2
   "*Default number of bytes of header to examine the file is mp3 or not.
-MP3¥Õ¥¡¥¤¥ë¤«¤É¤¦¤«¤òÄ´¤Ù¤ë¤¿¤á¤ËÆÉ¤ß¹þ¤à¥Õ¥¡¥¤¥ë¤ÎÀèÆ¬¤Î¥Ð¥¤¥È¿ô")
+MP3$B%U%!%$%k$+$I$&$+$rD4$Y$k$?$a$KFI$_9~$`%U%!%$%k$N@hF,$N%P%$%H?t(B")
 
 (defvar mpg123-mode-map nil)
 (setq mpg123-mode-map (make-keymap))
@@ -281,19 +285,23 @@ MP3¥Õ¥¡¥¤¥ë¤«¤É¤¦¤«¤òÄ´¤Ù¤ë¤¿¤á¤ËÆÉ¤ß¹þ¤à¥Õ¥¡¥¤¥ë¤ÎÀèÆ¬¤Î¥Ð¥¤¥È¿ô")
 (defun mpg123:sound-p (f)
   "Check the file F is MPEG 1 Audio file or not."
   (and (> (nth 7 (file-attributes (file-truename f))) 128) ;check file size > 128
-       (let ((b (get-buffer-create " *mpg123tmp*"))
+       (let ((b (set-buffer (get-buffer-create " *mpg123tmp*")))
 	     (file-coding-system-alist (list (cons "." 'no-conversion))) ;20
-	     (file-coding-system-for-read)) ;19
+	     (file-coding-system '*noconv*)
+	     (ofs (if (and (string-match "19.28" emacs-version)
+			   (featurep 'mule))
+		      -1 1))
+	     (file-coding-system-for-read '*noconv*)) ;19
 	 (set-buffer b)
 	 (erase-buffer)
-	 (insert ?.)			;dummy dot to simplify the while loop
+	 (insert "..")			;dummy dot to simplify the while loop
 	 (insert-file-contents f nil 0 mpg123-mp3-scan-bytes)
 	 (goto-char (point-min))
 	 (prog1 ; if short & 0xfff0 = 0xfff0, it is MPEG audio
 	     (catch 'found
 	       (while (> (skip-chars-forward "^\xff") 0) ;Scan `0xff'
-		 (if (and (char-after (1+ (point))) ;not eobp
-			  (= (logand (char-after (1+ (point))) ?\xF0) ?\xF0))
+		 (if (and (char-after (+ ofs (point)))
+			  (= (logand (char-after (+ ofs (point))) ?\xF0) ?\xF0))
 		     (throw 'found t))))
 	   (kill-buffer b)))))
 
@@ -412,13 +420,13 @@ Anyway, you have to make sure that mpg123 program plays
 mp3 files on your pseudo terminal(xterm, rxvt, etc).
 -- Type SPC to exit ---
 
-¥µ¥¦¥ó¥É¥Ç¥Ð¥¤¥¹¤¬³«¤±¤óÁÇ¡£
-¤³¤Î¥Þ¥·¥ó¤Î¥ª¡¼¥Ç¥£¥ª¥Ç¥Ð¥¤¥¹¤Ï¤Á¤ã¤ó¤ÈÀßÄê¤·¤¿¤±?
-¤¢¤È¡¢¤Û¤«¤Ë¥µ¥¦¥ó¥É¥Ç¥Ð¥¤¥¹¤ò»È¤¦¥¢¥×¥ê¥±¡¼¥·¥ç¥ó¤òµ¯Æ°¤·¤Æ
-¤¤¤ë¤ó¤Á¤ã¤¦?
-¤Þ¤º¡¢kterm¤Ê¤É¤Ç mpg123 ¥³¥Þ¥ó¥ÉÃ±ÆÈ¤Ç²»³ÚºÆÀ¸¤Ç¤­¤ë¤«¤É¤¦¤«
-³ÎÇ§¤·¤Æ¤ß¤ì¡£
-(¥¹¥Ú¡¼¥¹¥­¡¼¤Ç¥ª¥µ¥é¥Ð)
+$B%5%&%s%I%G%P%$%9$,3+$1$sAG!#(B
+$B$3$N%^%7%s$N%*!<%G%#%*%G%P%$%9$O$A$c$s$H@_Dj$7$?$1(B?
+$B$"$H!"$[$+$K%5%&%s%I%G%P%$%9$r;H$&%"%W%j%1!<%7%g%s$r5/F0$7$F(B
+$B$$$k$s$A$c$&(B?
+$B$^$:!"(Bkterm$B$J$I$G(B mpg123 $B%3%^%s%IC1FH$G2;3Z:F@8$G$-$k$+$I$&$+(B
+$B3NG'$7$F$_$l!#(B
+($B%9%Z!<%9%-!<$G%*%5%i%P(B)
 ***********************************************************" (point)))
   
 
@@ -998,7 +1006,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
       (while (search-forward "\0" nil t)
 	(replace-match "")))
     (save-excursion
-      (while (search-forward "¡¡" nil t) (replace-match " ")))
+      (while (search-forward "$B!!(B" nil t) (replace-match " ")))
     (save-excursion
       (while (re-search-forward "\\s \\s +" nil t)
       (replace-match " ")))
@@ -1162,7 +1170,7 @@ mpg123:
   (if (integerp vollist) (setq vollist (cons vollist vollist)))
   (if mpg123-mixer-command
       (cond
-       ((memq mpg123-system-type '(freebsd linux solaris))
+       ((memq mpg123-system-type '(freebsd linux solaris nt))
 	(let ((l mpg123-mixer-setvol-target-list)
 	      (v (format "%d:%d" (car vollist) (cdr vollist)))
 	      args)
