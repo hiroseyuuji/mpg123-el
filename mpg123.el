@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123
 ;;; (c)1999 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Sep 10 11:02:31 1999 on firestorm
-;;; Update count: 515
+;;; Last modified Sat Sep 25 16:05:26 1999 on firestorm
+;;; Update count: 526
 
 ;;[Commentary]
 ;;	
@@ -154,6 +154,10 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.7  1999/09/25 07:09:44  yuuji
+;; mpg123-delete-file can delete music only from the list, not on the disk.
+;; Shuffle after mpg123-delete-file now works correctly.
+;;
 ;; Revision 1.6  1999/09/10 02:09:02  yuuji
 ;; mpg123-mp3-scan-bytes
 ;; defmacro changed to defsubst
@@ -238,6 +242,7 @@ MP3ファイルかどうかを調べるために読み込むファイルの先頭のバイト数")
 (define-key mpg123-mode-map "i" 'mpg123-increase-repeat-count)
 (define-key mpg123-mode-map "d" 'mpg123-decrease-repeat-count)
 (define-key mpg123-mode-map "k" 'mpg123-kill-line)
+(define-key mpg123-mode-map "K" 'mpg123-kill-stack)
 (define-key mpg123-mode-map "y" 'mpg123-yank-line)
 (define-key mpg123-mode-map "s" 'mpg123-shuffle)
 (define-key mpg123-mode-map "\C-d" 'mpg123-delete-file)
@@ -831,6 +836,11 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(goto-char (point-min))
 	(select-window sw))))
 
+(defun mpg123-kill-stack ()
+  "Kill all music list in stack."
+  (interactive)
+  "Not yet implemented")
+
 (defun mpg123-yank-line (arg)
   "Yank music line from stack buffer."
   (interactive "p")
@@ -884,21 +894,24 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
   (message "Shuffle music by...(O)rder, (I)nverse order, (R)andom: ")
   (let ((c (or method (read-char)))
 	ord (n 0) (l (length mpg123*music-alist))
-	r tmp buffer-read-only (p (point)))
+	r tmp buffer-read-only (p (point))
+	(number-list (sort (mapcar (function (lambda (s) (car s)))
+				   mpg123*music-alist)
+			   '<)))
     (cond
      ((eq c ?o)
       (setq n l)
-      (while (> n 0)
-	(setq ord (cons n ord)
-	      n (1- n))))
+      (while (>= (setq n (1- n)) 0)
+	(setq ord (cons (nth n number-list) ord))))
      ((eq c ?i)
-      (while (<= (setq n (1+ n)) l)
-	(setq ord (cons n ord))))
+      (while (< n l)
+	(setq ord (cons (nth n number-list) ord)
+	      n (1+ n))))
      ((eq c ?r)
       (random t)
       (setq ord (make-vector l nil))
       (while (< n l)
-	(aset ord n (1+ n)) (setq n (1+ n)))
+	(aset ord n (nth n number-list)) (setq n (1+ n)))
       (while (>= (setq n (1- n)) 0)
 	(setq r (random l)
 	      tmp (aref ord r))
@@ -924,16 +937,17 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
   (interactive)
   (if (not (mpg123:in-music-list-p))
     (error "Not on music list"))
-  (let*((n (mpg123:get-music-number)) p
+  (let*((n (mpg123:get-music-number)) p c
 	(file (mpg123:get-music-info n 'filename)))
+    (message "Delete file?(%s) [Y]es, [L]from list, [N]o"
+	     (file-name-nondirectory file))
+    (setq c (read-char))
     (cond
-     ((not (y-or-n-p (format "Delete file?(%s): "
-			     (file-name-nondirectory file))))
-      (message "Canceled"))
-     (t
+     ((memq c '(?y ?Y ?L ?l))
       (beginning-of-line)
       (setq p (point))
       (if (and mpg123*cur-play-marker
+	       (marker-position mpg123*cur-play-marker)
 	       (eq (point)
 		   (save-excursion
 		     (goto-char mpg123*cur-play-marker)
@@ -941,10 +955,12 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 		     (point))))
 	  (save-excursion (mpg123-> 1)))
       (let ((buffer-read-only nil))
-	(delete-file file)
+	(if (memq c '(?Y ?y)) (delete-file file))
 	(delete-region (point)
 		       (progn (forward-line 1) (point)))
-	(mpg123:delete-music-from-list n))))))
+	(mpg123:delete-music-from-list n)))
+     (t
+      (message "Canceled")))))
 
 (defun mpg123-quit ()
   "Quit"
@@ -1051,10 +1067,11 @@ mpg123:
 
 (defun mpg123:format-line (n)
   (if (stringp n) (setq n (string-to-int n)))
-  (format "%2d --:--/%s\t %s\n"
-	  n
-	  (or (mpg123:get-music-info n 'length) "--:--")
-	  (mpg123:get-music-info n 'name)))
+  (if (mpg123:get-music-info n 'name)
+      (format "%2d --:--/%s\t %s\n"
+	      n
+	      (or (mpg123:get-music-info n 'length) "--:--")
+	      (mpg123:get-music-info n 'name))))
 
 (defun mpg123-mode ()
   "mpg123 controling mode."
