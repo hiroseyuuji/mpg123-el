@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sun Oct 20 22:29:10 2002 on firestorm
-;;; Update count: 1051
+;;; Last modified Tue Dec 17 10:15:25 2002 on firestorm
+;;; Update count: 1052
 
 ;;[News]
 ;;	Multibyte music tag displayed wrong, fixed.
@@ -304,6 +304,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.35  2002/12/17 01:15:50  yuuji
+;; mpg123:get-sound-type ignores case
+;;
 ;; Revision 1.34  2002/10/20 13:31:41  yuuji
 ;; * (mpg123:playlist-p): Save and restore current buffer.
 ;; * (mpg123-quit): Don't switch to killed buffer.
@@ -620,7 +623,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
       (store-match-data md))))
 
 (defun mpg123:get-sound-type (name)
-  (cdr (assoc (mpg123:file-name-extension name) mpg123-type-alist)))
+  (cdr (assoc (downcase (mpg123:file-name-extension name)) mpg123-type-alist)))
 
 (defun mpg123:get-from-file-about (file what)
   (let* ((case-fold-search t)
