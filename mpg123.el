@@ -1,9 +1,9 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123
-;;; (c)1999-2001 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Feb 23 15:51:02 2001 on buell
-;;; Update count: 857
+;;; Last modified Fri Feb 15 13:33:59 2002 on balius
+;;; Update count: 862
 
 ;;[News]
 ;;	Key binding to Delete-file is changed from `C-d' to `D'.
@@ -243,10 +243,15 @@
 ;;		Sent information on OpenBSD.
 ;;	Toni Ronkko <tronkko@hytti.uku.fi>
 ;;		Many suggestions.
+;;	N. SHIMIZU <CZA06074@nifty.com>
+;;		Sent a patch to restore cursor position after id3-edit.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.25  2002/02/15 04:37:32  yuuji
+;; mpg123-refresh-tag, mpg123-id3-edit by N. SHIMIZU <CZA06074@nifty.com>
+;;
 ;; Revision 1.24  2001/02/23 06:54:30  yuuji
 ;; Only `>' obeys repetition count.
 ;;
@@ -418,7 +423,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "s" 'mpg123-shuffle)
 (define-key mpg123-mode-map "S" 'mpg123-save-playlist)
 (define-key mpg123-mode-map "D" 'mpg123-delete-file)
-(define-key mpg123-mode-map "E" 'id3-edit)
+(define-key mpg123-mode-map "E" 'mpg123-id3-edit)
 (define-key mpg123-mode-map "q" 'mpg123-quit)
 (define-key mpg123-mode-map "Q" 'mpg123-quit-yes)
 (if (and window-system)
@@ -451,6 +456,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*cur-playframe nil)
 (defvar mpg123*cur-start-frame "0")
 (defvar mpg123*cur-play-marker nil)
+(defvar mpg123*cur-edit-marker nil)
 (defvar mpg123*cur-repeat-count nil)
 (defvar mpg123*music-alist nil)
 (defvar mpg123*default-time-string "--:--/--:--\t")
@@ -492,7 +498,8 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 		    '*noconv*		;mule19
 		  'no-conversion))	;XEmacs(maybe)
 	       (file-coding-system-for-read '*noconv*) ;19
-	       (skipchars (if (string-match "^21\\.0\\.9" emacs-version)
+	       (skipchars (if (and (not (featurep 'xemacs))
+				   (string< "21" emacs-version))
 			      "\000-\177"
 			    "^\xff")))
 	   (set-buffer b)
@@ -1161,6 +1168,33 @@ percentage in the length of the song etc.
   (interactive "p")
   (mpg123-forward (* -10 arg)))
 
+;; 
+;; mpg123-refresh-tag contributed by N. SHIMIZU <CZA06074@nifty.com>
+;;
+(defun mpg123-refresh-tag ()
+  "Refresh line of edited file."
+  (switch-to-buffer (get-buffer-create mpg123*buffer))
+  (goto-char mpg123*cur-edit-marker)
+  (setq buffer-read-only nil)
+  (buffer-disable-undo)
+  (beginning-of-line)
+  (let (f name) 
+    (setq mpg123*cur-music-number (mpg123:get-music-number))
+    (setq f (mpg123:get-music-info mpg123*cur-music-number 'filename))
+    (setq name (if (fboundp mpg123-id3-tag-function)
+		   (funcall mpg123-id3-tag-function f)
+		 (file-name-nondirectory f)))
+    (mpg123:set-music-info mpg123*cur-music-number 'name name)
+    (search-forward "\t " nil t)
+    (insert-before-markers name))
+  (delete-region (point)
+		 (progn (end-of-line 1) (point)))
+  (beginning-of-line)
+  (skip-chars-forward "^:")
+  (setq buffer-read-only t))
+
+
+
 (defun mpg123-open-new (dir)
   "Open new directory or playlist."
   (interactive "Fmpg123 on directory or playlist: ")
@@ -1823,6 +1857,21 @@ the music will immediately move to that position.
 (defvar mpg123*initial-buffer nil)
 (setq mpg123*initial-buffer (current-buffer))
 
+;; 
+;; mpg123-id3-edit contributed by N. SHIMIZU <CZA06074@nifty.com>
+;;
+(defun mpg123-id3-edit ()
+  (interactive)
+  (let ((p (get-buffer-process (current-buffer))))
+    (if (and (and p (eq (process-status p) 'run))
+	     (= (save-excursion (beginning-of-line) (point))
+		 (save-excursion (goto-char mpg123*cur-play-marker) (point))))
+	(progn (ding)
+	       (message "Do not edit playing file!"))
+      (beginning-of-line)
+      (setq mpg123*cur-edit-marker (point-marker))
+      (id3-edit))))
+
 ;;;
 ;; mpg123 main function
 ;;;
@@ -1869,4 +1918,5 @@ the music will immediately move to that position.
 ; paragraph-start: "^$\\|\\|;;$" 
 ; paragraph-separate: "^$\\|\\|;;$" 
 ; buffer-file-coding-system: euc-jp
+; coding: euc-jp
 ; End: 
