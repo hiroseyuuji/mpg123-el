@@ -1,11 +1,15 @@
 ;;; -*- Emacs-Lisp -*-
-;;; A front-end program to mpg123
+;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2002 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Wed Sep 25 14:49:45 2002 on firestorm
-;;; Update count: 1012
+;;; Last modified Fri Sep 27 18:06:51 2002 on firestorm
+;;; Update count: 1043
 
 ;;[News]
+;;	Multibyte music tag displayed wrong, fixed.
+;;	Changing the width of emacs frame is allowed while playing.
+;;	Variable `mpg123-ogg123-id-coding-system controls coding system
+;;	for vorbiscomment.
 ;;	Support OggVorbis (thanks to Andreas Fuchs <asf@acm.org>)
 ;;	Rewind key `B' `b' move to previous music if they reache 00:00
 ;;	Variables `mpg123-command' and `mpg123-command-args' are changed
@@ -112,10 +116,14 @@
 ;;				Command name of mpg123
 ;;	  mpg123-mpg123-command-args	nil
 ;;				Argument list to pass mpg123 command
+;;	  mpg123-mpg123-id-coding-system	undefined
+;;				Coding system for mp3 tag message
 ;;	  mpg123-ogg123-command	"ogg123"
 ;;				Command name of ogg123
 ;;	  mpg123-ogg123-command-args	nil
 ;;				Argument list to pass ogg123 command
+;;	  mpg123-ogg123-id-coding-system	'junet  (or *junet* in mule2)
+;;				Coding system for tag message(vorbiscomment)
 ;;	  mpg123-mixer-command	"mixer"
 ;;				Command name of mixer(FreeBSD)
 ;;	  mpg123-preserve-playtime t
@@ -295,6 +303,11 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.33  2002/09/27 09:09:34  yuuji
+;; Multibyte music tag displayed wrong, fixed.
+;; Variable `mpg123-ogg123-id-coding-system controls coding system
+;; for vorbiscomment.
+;;
 ;; Revision 1.32  2002/09/25 05:50:21  yuuji
 ;; Fixed the bug when mpg123*use-face is nil.
 ;; Suggested by Yoichi NAKAYAMA <yoichi@eken.phys.nagoya-u.ac.jp>
@@ -422,6 +435,14 @@ ogg123のコマンド名")
 (defvar mpg123-ogg123-command-args nil
   ;;'("-d oss")	;<- example
   "*Arguments to give to ogg123")
+(defvar mpg123-ogg123-id-coding-system
+  (cond ((coding-system-p '*junet*) '*junet*)
+	((coding-system-p 'junet) 'junet)
+	(t nil))
+  "Preferred coding system of vorbisogg comment tag.
+Vorbiscomment describes that each tag's value can be encoded with utf8.
+However, vorbiscomment disallows 8bit.  So we use iso-20220jp instead.")
+
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
 	     '((freebsd . "mixer") (netbsd . "mixerctl") (openbsd . "mixerctl")
@@ -1820,11 +1841,11 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
       (if (looking-at "TAG")
 	  (progn
 	    (erase-buffer)
-	    (mpg123:insert-raw-file-contents file nil (- sz 125) (- sz 95))
+	    (insert-file-contents file nil (- sz 125) (- sz 95))
 	    (mpg123:squeeze-spaces-buffer)
 	    (setq title (buffer-string))
 	    (erase-buffer)
-	    (mpg123:insert-raw-file-contents file nil (- sz 95) (- sz 65))
+	    (insert-file-contents file nil (- sz 95) (- sz 65))
 	    (mpg123:squeeze-spaces-buffer)
 	    (setq artist (buffer-string))
 	    (kill-buffer b)
@@ -1839,6 +1860,21 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 	(if (fboundp 'code-convert-string)
 	    (code-convert-string file mpg123-process-coding-system *internal*)
 	  (file-name-nondirectory file))))))
+
+(defun mpg123:file-substring (file begin end &optional offset)
+  "Return FILE's substring from point value BEGIN to END.
+Note that buffer point is 1-origin, while file-offset is 0-origin.
+So insert-file-contents takes regions decremented by 1.
+Optional 4th arg OFFSET is added to BEGIN and END."
+  (let ((tmpbuf (get-buffer-create " *mpg123 filetmp*"))
+	(ofs (or offset 0)))
+    (save-excursion
+      (set-buffer tmpbuf)
+      (erase-buffer)
+      (insert-file-contents file nil (+ begin ofs -1) (+ end ofs -1))
+      (prog1
+	  (buffer-string)
+	(kill-buffer tmpbuf)))))
 
 (defun mpg123:ogg123-peek-tag (file)
   "Peek ogg comment area.
@@ -1886,15 +1922,19 @@ cf. NetBSD:/usr/share/misc/magic
 	    (setq comment-len (mpg123:hex-value commenthead 4 'little-endian))
 	    (goto-char (+ 4 commenthead 1))
 	    (cond
+	     ;;Call mpg123:file-substring for the sake of coding-system
+	     ;;detection.  Although it is more efficient to use
+	     ;;code-detection function and convert string directly
+	     ;;here, it augments dependency to emacs version.
 	     ((looking-at "artist=")
 	      (setq artist (cons
-			    (buffer-substring
-			     (+ 7 (point)) (+ comment-len (point)))
+			    (mpg123:file-substring
+			     file (+ 7 (point)) (+ comment-len (point)) ofs)
 			    artist)))
 	     ((looking-at "title=")
 	      (setq title (cons
-			   (buffer-substring
-			    (+ 6 (point)) (+ comment-len (point)))
+			   (mpg123:file-substring
+			    file (+ 6 (point)) (+ comment-len (point)) ofs)
 			   title))))
 	    (setq commenthead (+ commenthead 4 comment-len)
 		  num-comments (1- num-comments)))
@@ -2222,7 +2262,10 @@ the music will immediately move to that position.
 	(error "Do not edit playing file!")
       (beginning-of-line)
       (setq mpg123*cur-edit-marker (point-marker))
-      (id3-edit))))
+      (let*((file (mpg123:get-music-info (mpg123:get-music-number) 'filename))
+	    (code (mpg123:get-from-file-about file "id-coding-system")))
+	(id3-edit)
+	(if code (set (make-local-variable 'id3*coding) code))))))
 
 ;;;
 ;; mpg123 main function
