@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2003 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon May 26 19:23:14 2003 on firestorm
-;;; Update count: 1124
+;;; Last modified Sat Jul 26 13:22:37 2003 on firestorm
+;;; Update count: 1125
 
 ;;[News]
 ;;	mpg123-set-point-for-next-song-function, mpg123-format-name-function,
@@ -310,10 +310,17 @@
 ;;		Many enhancements; mpg123-set-point-for-next-song-function,
 ;;		mpg123-format-name-function, using SIGTERM, id3v1.1,
 ;;		mpg123-now-playing, fixes for non-mule XEmacs.
+;;	Hiroshi Imai <imai_hiroshi_niboshi@yahoo.co.jp>
+;;		Suggested not to alter mixer volume in mpg123:initialize
+;;		when mpg123-startup-volume is nil.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.40  2003/07/26 04:23:27  yuuji
+;; Do not alter mixer volume in mpg123:initialize	when
+;; mpg123-startup-volume is nil. Suggested by imai_hiroshi_niboshi@yahoo.co.jp.
+;;
 ;; Revision 1.39  2003/05/26 14:36:19  yuuji
 ;; Patch by moro@remus.dti.ne.jp;
 ;;  Fixed the failure of handling multi-byte chars in id3v1.1 support.
@@ -2426,7 +2433,7 @@ the music will immediately move to that position."
 (defun mpg123:initialize ()
   (if (get 'mpg123:initialize 'done)
       nil
-    (mpg123:set-volume mpg123-startup-volume)
+    (if mpg123-startup-volume (mpg123:set-volume mpg123-startup-volume))
     (put  'mpg123:initialize 'done t)))
 
 ;; 
