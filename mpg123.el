@@ -1,9 +1,9 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123/ogg123
-;;; (c)1999-2003 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2004 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Jul 26 13:22:37 2003 on firestorm
-;;; Update count: 1125
+;;; Last modified Wed Feb 11 00:56:15 2004 on firestorm
+;;; Update count: 1148
 
 ;;[News]
 ;;	mpg123-set-point-for-next-song-function, mpg123-format-name-function,
@@ -317,6 +317,10 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.41  2004/02/10 15:56:22  yuuji
+;; mpg123:draw-slider-help must always create mpg123*indicator-overlay.  Fixed.
+;; mpg123:window-width must check window-width of mpg123*buffer.  Fixed.
+;;
 ;; Revision 1.40  2003/07/26 04:23:27  yuuji
 ;; Do not alter mixer volume in mpg123:initialize	when
 ;; mpg123-startup-volume is nil. Suggested by imai_hiroshi_niboshi@yahoo.co.jp.
@@ -985,7 +989,10 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	 (set-process-filter proc 'mpg123:filter))))
 
 (defsubst mpg123:window-width ()
-  (if mpg123-auto-redraw (window-width) mpg123*window-width))
+  (if (and mpg123-auto-redraw
+	   (get-buffer-window mpg123*buffer t))
+      (window-width (get-buffer-window mpg123*buffer t))
+    mpg123*window-width))
 
 ;; (defun mpg123:move-slider (column)
 ;;   "Move slider to COLUMN"
@@ -1019,7 +1026,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		      (= mpg123*cur-playframe mpg123*cur-total-frame))
 		  (progn ;redraw & slider only if it's needed
 		    (and mpg123-auto-redraw
-			 (/= (window-width) mpg123*window-width)
+			 (/= (mpg123:window-width) mpg123*window-width)
 			 (mpg123:draw-slider-help nil))
 		    (mpg123:slider-check)))))))))
 
@@ -1135,12 +1142,16 @@ Set this as '(FGCOLOR . BGCOLOR)
   "*Set of default fgcolor/bgcolor of slider in indicator.
 演奏中の曲の相対位置を示す曲リスト下部のインジケータ内スライダーの色
 mpg123-face-playing のDOC-STRINGも参照せよ")
+(defvar mpg123-face-indicator '("yellow" . "#7f3000")
+  "*Set of default fgcolor/bgcolor of indicator bar.
+曲リスト下部のインジケータの (前景色 . 背景色)")
 
 (if (featurep 'xemacs) (require 'overlay))
 (if (and (fboundp 'make-face) mpg123*use-face)
     (progn
       (make-face 'mpg123-face-cur)
       (make-face 'mpg123-face-slider)
+      (make-face 'mpg123-face-indicator)
       (if (or (and (fboundp 'display-color-p)	;Emacs-21
 		   (display-color-p))
 	      (and (fboundp 'device-class) 	;XEmacs-21
@@ -1150,7 +1161,9 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	    (set-face-foreground 'mpg123-face-cur (car mpg123-face-playing))
 	    (set-face-background 'mpg123-face-cur (cdr mpg123-face-playing))
 	    (set-face-foreground 'mpg123-face-slider (car mpg123-face-slider))
-	    (set-face-background 'mpg123-face-slider (cdr mpg123-face-slider)))
+	    (set-face-background 'mpg123-face-slider (cdr mpg123-face-slider))
+	    (set-face-foreground 'mpg123-face-indicator (car mpg123-face-indicator))
+	    (set-face-background 'mpg123-face-indicator (cdr mpg123-face-indicator)))
 	(set-face-underline-p 'mpg123-face-cur t)
 	(set-face-underline-p 'mpg123-face-slider t)
 	(set-face-background 'mpg123-face-slider "white")))
@@ -1218,10 +1231,6 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
       (if mpg123*use-face
 	  (let ((frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
 		(istart mpg123*end-of-list-marker))
-	    (if (overlayp mpg123*indicator-overlay)
-		(delete-overlay mpg123*indicator-overlay))
-	    (setq mpg123*indicator-overlay
-		  (make-overlay istart (+ (mpg123:window-width) -1 istart)))
 	    (overlay-put (setq mpg123*cur-overlay
 			       (make-overlay
 				(save-excursion (beginning-of-line) (point))
@@ -1345,13 +1354,13 @@ percentage in the length of the song etc.
   (let (p)
     (cond
      ((mpg123:in-indicator-p)
-      (mpg123*jump-to-pos))
+      (mpg123:jump-to-pos))
      ((mpg123:in-music-list-p)
       (mpg123:kill-current-music)
       (mpg123-play-stop "0"))
      (t (message "Bad bad click, brother")))))
 
-(defun mpg123*jump-to-pos ()
+(defun mpg123:jump-to-pos ()
   "Jump to current music's certain position according to current column."
   (let ((p (get-buffer-process (current-buffer)))
 	(c (current-column))
@@ -1374,7 +1383,7 @@ percentage in the length of the song etc.
   "PLAY(from the beginning of the music)."
   (interactive)
   (cond
-   ((mpg123:in-indicator-p) (mpg123*jump-to-pos))
+   ((mpg123:in-indicator-p) (mpg123:jump-to-pos))
    (t (mpg123-play-stop "0"))))
 
 (defun mpg123-< (arg)
@@ -2117,7 +2126,8 @@ mpg123:
 \\[mpg123-backward-10]	" (m "Backard 10 sec" "10秒戻す") "
 \\[mpg123-next-line]	" (m "Move to next line" "次の行へ")"
 \\[mpg123-prev-line]	" (m "Move to previous line" "前の行へ") "
-\\[mpg123-volume-increase]	" (m "Volume up" "音量増加") "
+\\[mpg123-prev-line]	" (m "Move to previous line" "前の行へ") "
+\\[mpg123-goto-current-line]	" (m "Go to current music line" "演奏曲行へ") "
 \\[mpg123-volume-decrease]	" (m "Volume down" "音量減少") "
 \\[mpg123-open-new]	" (m "Open other directory or playlist file"
 			     "別のディレクトリ(またはプレイリスト)を開く") "
@@ -2162,7 +2172,7 @@ the music will immediately move to that position."
 
 (defun mpg123-mode ()
   "mpg123 controling mode."
-  (setq truncate-lines t)
+  (set (make-local-variable 'truncate-lines) t)
   (setq major-mode 'mpg123-mode
 	mode-name "mpg123"
 	mpg123*cur-music-number nil
@@ -2179,8 +2189,6 @@ the music will immediately move to that position."
 	(cb (current-buffer)))
     (or (eq cb buf) (setq mpg123*initial-buffer cb))
     (switch-to-buffer buf))
-  (make-local-variable 'truncate-lines)
-  (setq truncate-lines t)
   (setq mpg123*window-width (window-width))
   (setq buffer-read-only nil)
   (buffer-disable-undo)
@@ -2230,10 +2238,13 @@ the music will immediately move to that position."
 	(insert "100%"))	;4columns
     ;; (insert-char ?- (1- (window-width))))
     (insert-char ?- (1- mpg123*window-width)))
-  (if (not initial)
-      (let ((istart mpg123*end-of-list-marker))
-	(setq mpg123*indicator-overlay
-	      (make-overlay istart (+ mpg123*window-width -1 istart)))))
+  (overlay-put
+   (setq mpg123*indicator-overlay
+	 (make-overlay
+	  mpg123*end-of-list-marker
+	  (+ mpg123*window-width -1 mpg123*end-of-list-marker)))
+   'face
+   'mpg123-face-indicator)
   (insert "\n" (mpg123:lang-msg "Volume" "音量") ": [")
   (if (markerp mpg123*volume-marker)
       (set-marker mpg123*volume-marker nil))
