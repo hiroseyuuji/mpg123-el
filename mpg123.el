@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2004 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Sep 17 23:03:02 2004 on firestorm
-;;; Update count: 1262
+;;; Last modified Sat Dec  3 15:36:40 2005 on firestorm
+;;; Update count: 1278
 
 ;;[News]
 ;;	Support very long music.
@@ -117,6 +117,8 @@
 ;;	Here are the variables for your customization.
 ;;	
 ;;	  [Variable]		[Default value/Meaning]
+;;	  mpg123-default-dir	"~/mp3"
+;;				Default directory of mp3 files
 ;;	  mpg123-mpg123-command	"mpg123"
 ;;				Command name of mpg123
 ;;	  mpg123-mpg123-command-args	nil
@@ -356,10 +358,16 @@
 ;;	Hiroshi Imai <imai_hiroshi_niboshi@yahoo.co.jp>
 ;;		Suggested not to alter mixer volume in mpg123:initialize
 ;;		when mpg123-startup-volume is nil.
+;;	Faraz Shahbazker <faraz.shahbazker@gmail.com>
+;;		Sent a patch of new feature, `loop counter'.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.45  2005/12/03 06:40:25  yuuji
+;; Loop counter for current music introduced.
+;; Thanks to Faraz Shahbazker.
+;;
 ;; Revision 1.44  2004/09/17 14:03:13  yuuji
 ;; Fixed argument handling in mpg123-delete-file.
 ;;
@@ -545,12 +553,14 @@ ogg123のコマンド名")
   "*Arguments to give to ogg123")
 (defvar mpg123-ogg123-id-coding-system
   (and (fboundp 'coding-system-p)
-       (cond ((coding-system-p '*junet*) '*junet*)
+       (cond ((and (coding-system-p 'utf-8)
+		   (or (featurep 'un-define) (string< "21.3" emacs-version)))
+	      'utf-8)
+	     ((coding-system-p '*junet*) '*junet*)
 	     ((coding-system-p 'junet) 'junet)
 	     (t nil)))
   "Preferred coding system of vorbisogg comment tag.
-Vorbiscomment describes that each tag's value can be encoded with utf8.
-However, vorbiscomment disallows 8bit.  So we use iso-20220jp instead.")
+If running Emacs knows utf-8, use it.  If any, we use iso-20220jp instead.")
 
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-system-type
@@ -646,6 +656,8 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "a" 'mpg123-add-new)
 (define-key mpg123-mode-map "i" 'mpg123-increase-repeat-count)
 (define-key mpg123-mode-map "d" 'mpg123-decrease-repeat-count)
+(define-key mpg123-mode-map "L" 'mpg123-increase-loop-count)
+(define-key mpg123-mode-map "l" 'mpg123-decrease-loop-count)
 (define-key mpg123-mode-map "k" 'mpg123-kill-line)
 (define-key mpg123-mode-map "K" 'mpg123-kill-stack)
 (define-key mpg123-mode-map "y" 'mpg123-yank-line)
@@ -693,6 +705,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*cur-play-marker nil)
 (defvar mpg123*cur-edit-marker nil)
 (defvar mpg123*cur-repeat-count nil)
+(defvar mpg123*cur-loop-count 0)
 (defvar mpg123*music-alist nil)
 (defvar mpg123*default-time-string "--:--/--:--\t")
 (defvar mpg123*interrupt-p nil)
@@ -701,6 +714,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*volume-marker nil)
 (defvar mpg123*time-setting-mode nil)
 (defvar mpg123*repeat-count-marker nil)
+(defvar mpg123*loop-count-marker nil)
 ;(defvar mpg123-playlist-regexp ".*\\.m3u"
 ;  "*Regular expression to match to playlist files")
 (defvar mpg123-url-regexp "http://.*"
@@ -983,6 +997,22 @@ If optional argument PATTERN given, search it(tentative)."
 	((= mpg123*cur-repeat-count 0) "--")
 	((= mpg123*cur-repeat-count -1) "oo")
 	(t (format "%02d" mpg123*cur-repeat-count)))))))
+
+
+(defun mpg123:update-loop-count ()
+  "Update repetition meter"
+  (set-buffer mpg123*buffer)
+  (let (buffer-read-only)
+    (save-excursion
+      (goto-char mpg123*loop-count-marker)
+      (delete-region (point) (progn (skip-chars-forward "^\\]") (point)))
+      (insert
+       (cond
+	((= mpg123*cur-loop-count 0) "--")
+	((= mpg123*cur-loop-count -1) "oo")
+	(t (format "%02d" mpg123*cur-loop-count)))))))
+
+
 
 (defun mpg123:repeat-check ()
   (cond
@@ -1302,9 +1332,14 @@ if slider is already visible.
       (skip-chars-forward " ")
       (setq music (mpg123:get-music-info mpg123*cur-music-number 'filename)
 	    mpg123*cur-music-file music)
-      (if (fboundp 'code-convert-string)
-	  (setq music (code-convert-string
-		       music mpg123-process-coding-system *internal*)))
+      (cond
+       ((fboundp 'code-convert-string)
+	(setq music (code-convert-string
+		     music mpg123-process-coding-system *internal*)))
+       ((fboundp 'decode-coding-strin)
+	(setq music (decode-coding-string
+		     music (or mpg123-process-coding-system
+			       default-file-name-coding-system)))))
       (and (eq mpg123-system-type 'nt)		;convert to dos filename for
 	   (fboundp 'unix-to-dos-file-name)	;music over shared folder(Win)
 	   (setq music (unix-to-dos-file-name music)))
@@ -1764,6 +1799,35 @@ percentage in the length of the song etc.
   (interactive "p")
   (mpg123-increase-repeat-count (- arg)))
 
+
+(defun mpg123-loop-dummy ()
+  "Dummy function to cause mpg123-set-point-for-next-song-function to loop"
+  (if (not (= mpg123*cur-loop-count -1))
+    (mpg123-decrease-loop-count 1))
+  t)
+
+
+(defun mpg123-increase-loop-count (arg)
+  "Increase loop count."
+  (interactive "p")
+  (setq mpg123*cur-loop-count
+	(min 99 (max -1 (+ arg mpg123*cur-loop-count))))
+  (cond 
+   ((or (= mpg123*cur-loop-count 0) (eq mpg123*cur-loop-count nil))
+    (setq mpg123-set-point-for-next-song-function nil))
+   (t 
+    (setq mpg123-set-point-for-next-song-function 'mpg123-loop-dummy)))
+  (mpg123:update-loop-count))
+
+
+(defun mpg123-decrease-loop-count (arg)
+  "Decrease loop count."
+  (interactive "p")
+  (if (= mpg123*cur-loop-count -1)
+      (mpg123-increase-loop-count 1)
+    (mpg123-increase-loop-count (- arg))))
+
+
 (defun mpg123:get-music-number ()
   "Get current line's music number."
   (save-excursion
@@ -2219,9 +2283,12 @@ When called from function, optional argument COMMAND directly select the job."
 			(concat " by " artist)))))
 	(kill-buffer b)
 	(setq file (file-name-nondirectory file))
-	(if (fboundp 'code-convert-string)
-	    (code-convert-string file mpg123-process-coding-system *internal*)
-	  (file-name-nondirectory file))))))
+	(cond
+	 ((fboundp 'code-convert-string)
+	  (code-convert-string file mpg123-process-coding-system *internal*))
+	 ((fboundp 'decode-coding-string)
+	  (decode-coding-string file mpg123-process-coding-system))
+	 (t file))))))
 
 (defun mpg123:file-substring (file begin end &optional offset)
   "Return FILE's substring from point value BEGIN to END.
@@ -2233,7 +2300,7 @@ Optional 4th arg OFFSET is added to BEGIN and END."
     (save-excursion
       (set-buffer tmpbuf)
       (erase-buffer)
-      (insert-file-contents file nil (+ begin ofs -1) (+ end ofs -1))
+      (mpg123:insert-raw-file-contents file nil (+ begin ofs -1) (+ end ofs -1))
       (prog1
 	  (buffer-string)
 	(kill-buffer tmpbuf)))))
@@ -2302,6 +2369,17 @@ cf. NetBSD:/usr/share/misc/magic
 		  num-comments (1- num-comments)))
 	  (setq artist (mapconcat 'concat (nreverse artist) ", ")
 		title  (mapconcat 'concat (nreverse title) ", "))
+
+	  (cond
+	   ((fboundp 'decode-coding-string)
+	    (setq title (decode-coding-string
+			 title mpg123-ogg123-id-coding-system)
+		  artist (decode-coding-string
+			  artist mpg123-ogg123-id-coding-system)))
+	   ((fboundp 'code-convert-string)
+	    (setq title (code-convert-string
+			 title *noconv* mpg123-ogg123-id-coding-system)))
+	   )
 	  (if (string< "" title)
 	      (concat title
 		      (if (and (string< "" artist)
@@ -2368,6 +2446,10 @@ mpg123:
 					     "繰り返し数を増加") "
 \\[mpg123-decrease-repeat-count]\t" (m "Decrease repetition count (-1 for infinity)"
 				       "繰り返し数を減少(-1で無限回)") "
+\\[mpg123-increase-loop-count]	" (m "Increase current loop count"
+					     "今の曲の繰り返し数増加") "
+\\[mpg123-decrease-loop-count]\t" (m "Decrease current loop count. Also toggles between 0(no loop) and -1(always loop)"
+				       "今の曲の繰り返し数減少(-1で無限回)") "
 \\[mpg123-shuffle]	" (m "Shuffle music list" "再生リストのシャッフル") "
 \\[mpg123-delete-file]	" (m "Delete music file" "曲ファイルの削除") "
 \\[mpg123-display-slider]	" (m "Display playing position indicator" "演奏位置表示スライダーを見せる") "
@@ -2423,11 +2505,13 @@ the music will immediately move to that position."
 	(cb (current-buffer)))
     (or (eq cb buf) (setq mpg123*initial-buffer cb))
     (switch-to-buffer buf))
-  (setq mpg123*window-width (window-width))
-  (setq buffer-read-only nil)
+  (setq mpg123*window-width (window-width)
+	buffer-read-only nil
+	mpg123*indicator-overlay nil
+	mpg123*slider-overlay nil
+	mpg123*music-alist nil)
   (buffer-disable-undo)
   (erase-buffer)
-  (setq mpg123*music-alist nil)
   (cd dir) (setq default-directory dir)
   (save-excursion
     (set-buffer (get-buffer-create mpg123*stack-buffer))
@@ -2459,9 +2543,11 @@ the music will immediately move to that position."
       (insert-before-markers (mpg123:format-line i))
       (if (featurep 'xemacs)
 	  (let ((pt (point)))
-	    (move-overlay mpg123*slider-overlay pt (1+ pt))
-	    (move-overlay mpg123*indicator-overlay
-			  pt (+ pt mpg123*window-width))))
+	    (if (overlayp mpg123*slider-overlay)
+		(move-overlay mpg123*slider-overlay pt (1+ pt)))
+	    (if (overlayp mpg123*indicator-overlay)
+		(move-overlay mpg123*indicator-overlay
+			      pt (+ pt mpg123*window-width)))))
       (setq i (1+ i)
 	    files (cdr files)))))
 
@@ -2503,10 +2589,15 @@ the music will immediately move to that position."
   (setq mpg123*volume-marker (point-marker))
   (insert (format "--:--]"))
   (mpg123:update-volume (mpg123:get-volume))
-  (insert " " (mpg123:lang-msg "Repeat" "繰り返し数") ": [")
+  (insert " " (mpg123:lang-msg "Repeat" "全体繰り返し数") ": [")
   (if (markerp mpg123*repeat-count-marker)
       (set-marker mpg123*repeat-count-marker nil))
   (setq mpg123*repeat-count-marker (point-marker))
+  (insert (format "--]"))
+  (insert " " (mpg123:lang-msg "Loop" "今の曲繰り返し数") ": [")
+  (if (markerp mpg123*loop-count-marker)
+      (set-marker mpg123*loop-count-marker nil))
+  (setq mpg123*loop-count-marker (point-marker))
   (insert (format "--]"))
   (mpg123:update-repeat-count)
   (mpg123:insert-help)
@@ -2527,7 +2618,7 @@ the music will immediately move to that position."
 (defun mpg123-save-playlist (file)
   "Save current music list into a file"
   (interactive "FSave Playlist to a file: ")
-  (let (list n fn marktime (dd (expand-file-name default-directory)))
+  (let (list n fn marktime (dd (expand-file-name default-directory)) sdp)
     (or (eq major-mode 'mpg123-mode)
 	(error "[Save playlist] is only available in *mpg123* buffer."))
     (if (file-exists-p file)
@@ -2544,11 +2635,13 @@ the music will immediately move to that position."
 	  (forward-line 1))
 	(set-buffer (find-file-noselect file))
 	(erase-buffer)
+	(setq sdp (string= (expand-file-name default-directory) dd))
 	(while list
 	  (goto-char (point-min))
 	  (setq fn (mpg123:get-music-info (car list) 'filename)
 		marktime (mpg123:get-music-info (car list) 'marktime))
-	  (if (string-match (concat "^" (regexp-quote dd)) fn)
+	  (if (and sdp
+		   (string-match (concat "^" (regexp-quote dd)) fn))
 	      (setq fn (substring fn (match-end 0))))
 	  (insert (concat
 		   (abbreviate-file-name fn)
