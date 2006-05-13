@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2006 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat May 13 19:46:38 2006 on firestorm
-;;; Update count: 1317
+;;; Last modified Sat May 13 19:51:38 2006 on firestorm
+;;; Update count: 1322
 
 ;;[News]
 ;;	New variable mpg123-file-name-coding-system might help correct
@@ -24,15 +24,15 @@
 ;;	
 ;;[Installation]
 ;;	
-;;	You have to install mpg123 0.59q or later, ogg123 1.0 or later
+;;	You have to  install mpg123 0.59q or later,  ogg123 1.0 or later
 ;;	first, and get they work fine.  Check `mpg123 -v' or `ogg123 -v'
-;;	option if it displays the decoding frame number or not.  If it
-;;	looks good, then the preparation has been done.  Install this
-;;	emacs-lisp into your load-path directory.  And put the
+;;	option if it  displays the decoding frame number  or not.  If it
+;;	looks good,  then the preparation  has been done.   Install this
+;;	emacs-lisp   into  your  load-path   directory.   And   put  the
 ;;	expression below into your ~/.emacs.
 ;;	
 ;;	  [~/.emacs]
-;;		(autoload 'mpg123 "mpg123" "A Front-end to mpg123" t)
+;;		(autoload 'mpg123 "mpg123" "A Front-end to mpg123/ogg123" t)
 ;;	
 ;;	まず、mpg123あるいはogg123の正常動作を確認してから上の行を~
 ;;	/.emacsに追加します。なおmpg123は0.59q以上でないと正常に動作しな
@@ -76,27 +76,27 @@
 ;;	
 ;;	If you  give `M-x mpg123' a  simple file which  consists of file
 ;;	name list;  one file  name per line,  mpg123.el assumes it  as a
-;;	playlist file.   All of  mp3 files listed  in playlist  file are
+;;	playlist file.  All  of audio files listed in  playlist file are
 ;;	incorporated in *mpg123* playing  buffer.  If a line in playlist
 ;;	points  to another  playlist file,  file is  parsed recursively.
 ;;	There are mainly two ways to create a playlist file.
 ;;	
 ;;		* Typing `S' in *mpg123* buffer
 ;;		* Create directly on the shell;
-;;		  Ex. % ls */*.mp3 > playlist
+;;		  Ex. % ls */*.mp3 */*.ogg > playlist
 ;;	
 ;;	Because a playlist is very simple, you can edit it manually to
 ;;	arrange the order of music list.
 ;;	
 ;;	M-x mpg123 のあとに、一行に一つMP3ファイルの名前が書かれた普通の
 ;;	ファイルを指定するとmpg123.elはそれをプレイリストファイルだとみ
-;;	なし、そこに書かれているMP3ファイル群を *mpg123* 音楽一覧バッファ
+;;	なし、そこに書かれている音楽ファイル群を *mpg123* 音楽一覧バッファ
 ;;	に全て取り込みます。プレイリストファイルを作るには二つの方法があ
 ;;	ります。
 ;;	
 ;;		* 音楽一覧(*mpg123*)バッファで S を押す
 ;;		* シェルの上で直接作る
-;;		  【例】 % ls */*.mp3 > playlist
+;;		  【例】 % ls */*.mp3 */*.ogg > playlist
 ;;	
 ;;	プレイリストファイルはとても単純なので、直接編集して好きな曲順を
 ;;	リストを作るのは簡単でしょう。プレイリストファイル中に別のプレイ
@@ -195,9 +195,9 @@
 ;;	
 ;;[For Extension]
 ;;	
-;;	If you want to make an extension to support other sound format
-;;	and its player, you should define some variables and functions.
-;;	Suppose ".foo" is sound file name suffix, and "foo123" is its
+;;	If you want  to make an extension to  support other sound format
+;;	and its player, you  should define some variables and functions.
+;;	Suppose ".foo"  is sound file  name suffix, and "foo123"  is its
 ;;	player software.  Define as follows;
 ;;	
 ;;	mpg123-type-alist	Add cons of '("foo" . "foo123").
@@ -220,8 +220,8 @@
 ;;	
 ;;[Introduction-Quiz mode]
 ;;	
-;;	When enable mpg123-introduction-quiz-mode by typing "I",  mpg123
-;;	always stops at marked position in order to wait until audience
+;;	When enable mpg123-introduction-quiz-mode  by typing "I", mpg123
+;;	always stops at marked position  in order to wait until audience
 ;;	give an answer.
 ;;	
 ;;	To   prepare   introduction-quiz,   you   shoulde   mark   every
@@ -267,9 +267,9 @@
 ;;	
 ;;	This  program is  free  software and  comes  with absolutely  NO
 ;;	WARRANTY.   The  author  is  not responsible  for  any  possible
-;;	defects caused by this software.  You can freely modify this
-;;	program for your convenience.  But if you want to publish
-;;	modified program, please tell me before announcement.  Take it
+;;	defects  caused by this  software.  You  can freely  modify this
+;;	program  for  your convenience.   But  if  you  want to  publish
+;;	modified program,  please tell me before  announcement.  Take it
 ;;	easy to write me comments and bug-reports.
 ;;							yuuji@gentei.org
 ;;	
@@ -278,7 +278,7 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2002/9現在)。
+;;	下のアドレスまでお願いします(2006/5現在)。
 ;;							yuuji@gentei.org
 ;;[Acknowledgements]
 ;;	
@@ -354,6 +354,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.47  2006/05/13 10:52:51  yuuji
+;; Revise documentation.
+;;
 ;; Revision 1.46  2006/05/13 10:49:45  yuuji
 ;; New variable mpg123-file-name-coding-system might help correct
 ;; handling of multi-byte file names.
