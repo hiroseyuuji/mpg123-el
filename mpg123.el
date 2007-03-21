@@ -2,13 +2,12 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2006 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat May 13 19:51:38 2006 on firestorm
-;;; Update count: 1322
+;;; Last modified Thu Mar 22 00:06:15 2007 on firestorm
+;;; Update count: 1326
 
 ;;[News]
-;;	New variable mpg123-file-name-coding-system might help correct
-;;	handling of multi-byte file names.
-;;	Using ogginfo if available, to get ogg files information.
+;;	New hooks 'mpg123-song-started-hook and 'mpg123-song-finished-hook
+;;	introduced. (by lenbok@gmail.com)
 ;;	
 ;;[Commentary]
 ;;	
@@ -34,8 +33,8 @@
 ;;	  [~/.emacs]
 ;;		(autoload 'mpg123 "mpg123" "A Front-end to mpg123/ogg123" t)
 ;;	
-;;	まず、mpg123あるいはogg123の正常動作を確認してから上の行を~
-;;	/.emacsに追加します。なおmpg123は0.59q以上でないと正常に動作しな
+;;	まず、mpg123あるいはogg123の正常動作を確認してから上の行を
+;;	~/.emacsに追加します。なおmpg123は0.59q以上でないと正常に動作しな
 ;;	い可能性があります(もっと新しいのが出たらまた怪しいかもしれん…)。
 ;;	ogg123は1.0で動作確認してますがそれ以外でも大丈夫でしょう。
 ;;	mpg123(または ogg123)コマンド に -v オプションをつけて起動し音楽
@@ -278,7 +277,7 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2006/5現在)。
+;;	下のアドレスまでお願いします(2007/3現在)。
 ;;							yuuji@gentei.org
 ;;[Acknowledgements]
 ;;	
@@ -341,6 +340,7 @@
 ;;	Len Trigg <lenbok@myrealbox.com>
 ;;		Sent a patch and report on playlist file parsing.
 ;;		Remote control stuffs.
+;;		Hooks for helper application.
 ;;	Rene Kyllingstad <kyllingstad@users.sourceforge.net>
 ;;		Many enhancements; mpg123-set-point-for-next-song-function,
 ;;		mpg123-format-name-function, using SIGTERM, id3v1.1,
@@ -354,6 +354,10 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.48  2007/03/21 15:06:22  yuuji
+;; New hooks 'mpg123-song-started-hook and 'mpg123-song-finished-hook
+;; introduced. (by lenbok@gmail.com)
+;;
 ;; Revision 1.47  2006/05/13 10:52:51  yuuji
 ;; Revise documentation.
 ;;
@@ -1040,6 +1044,14 @@ If optional argument PATTERN given, search it(tentative)."
       (mpg123:update-repeat-count)
       mpg123*cur-repeat-count)))
 
+(defun mpg123:max-music-number ()
+  "Returns the maximal music number from mpg123*music-alist, or 0 if empty."
+  (if mpg123*music-alist
+      (car (sort (mapcar (function (lambda (s) (car s)))
+                         mpg123*music-alist)
+                 '>))
+    0))
+
 (defun mpg123:set-music-info (n attr value)
   (let ((cur (cdr (assoc n mpg123*music-alist))))
     (setq cur (cons (cons attr value)
@@ -1189,6 +1201,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 		(sf (selected-frame)) mp3w p)
             (set-buffer mpg123*buffer)
             (goto-char mpg123*cur-play-marker)
+            (run-hooks 'mpg123-song-finished-hook)
 	    (or (and (fboundp mpg123-set-point-for-next-song-function)
 		     (funcall mpg123-set-point-for-next-song-function))
 		(mpg123-next-line 1))
@@ -1427,6 +1440,7 @@ if slider is already visible.
 		   (mpg123:get-music-info mpg123*cur-music-number 'name)))
       (set-process-sentinel p 'mpg123:sentinel)
       ;;display slider is little bit heavy, doit after starting process
+      (run-hooks 'mpg123-song-started-hook)
       (mpg123-display-slider))))
 
 (defun mpg123:sure-kill (p)
@@ -1721,25 +1735,29 @@ percentage in the length of the song etc.
   "Refresh line of edited file."
   (switch-to-buffer (get-buffer-create mpg123*buffer))
   (goto-char mpg123*cur-edit-marker)
-  (setq buffer-read-only nil)
-  (buffer-disable-undo)
-  (beginning-of-line)
-  (let (f name) 
-    (setq mpg123*cur-music-number (mpg123:get-music-number))
-    (setq f (mpg123:get-music-info mpg123*cur-music-number 'filename))
-    (setq name (if (fboundp mpg123-id3-tag-function)
-		   (funcall mpg123-id3-tag-function f)
-		 (file-name-nondirectory f)))
-    (mpg123:set-music-info mpg123*cur-music-number 'name name)
-    (search-forward "\t " nil t)
-    (insert-before-markers name))
-  (delete-region (point)
-		 (progn (end-of-line 1) (point)))
-  (beginning-of-line)
-  (skip-chars-forward "^:")
-  (setq buffer-read-only t))
+  (mpg123-refresh-tag-at-point))
 
-
+(defun mpg123-refresh-tag-at-point ()
+  "Refresh tags for file under point."
+  (cond
+   ((mpg123:in-music-list-p)
+    (setq buffer-read-only nil)
+    (buffer-disable-undo)
+    (beginning-of-line)
+    (let (f name) 
+      (setq mpg123*cur-music-number (mpg123:get-music-number))
+      (setq f (mpg123:get-music-info mpg123*cur-music-number 'filename))
+      (setq name (if (fboundp mpg123-id3-tag-function)
+                     (funcall mpg123-id3-tag-function f)
+                   (file-name-nondirectory f)))
+      (mpg123:set-music-info mpg123*cur-music-number 'name name)
+      (search-forward "\t " nil t)
+      (insert-before-markers name))
+    (delete-region (point)
+                   (progn (end-of-line 1) (point)))
+    (beginning-of-line)
+    (skip-chars-forward "^:")
+    (setq buffer-read-only t))))
 
 (defun mpg123-open-new (dir)
   "Open new directory or playlist."
@@ -2582,7 +2600,7 @@ the music will immediately move to that position."
 (defun mpg123:add-musiclist-to-point (files i)
   "Add music FILES to point and music-info-alist"
   (let ((file-name-coding-system mpg123-file-name-coding-system)
-	f sf (i (1+ (length mpg123*music-alist))) name)
+	f sf (i (1+ (mpg123:max-music-number))) name)
     (while files
       (setq f (car files))
       (put 'mpg123:add-musiclist-to-point 'length nil)
@@ -2669,7 +2687,7 @@ the music will immediately move to that position."
 
 (defun mpg123-add-to-playlist (files)
   "Add files to the current playlist"
-  (switch-to-buffer (get-buffer-create mpg123*buffer))
+  (set-buffer (get-buffer-create mpg123*buffer))
   (setq buffer-read-only nil)
   (buffer-disable-undo)
   (save-excursion
