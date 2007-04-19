@@ -2,10 +2,11 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2006 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Thu Mar 22 00:06:15 2007 on firestorm
-;;; Update count: 1326
+;;; Last modified Thu Apr 19 09:05:12 2007 on firestorm
+;;; Update count: 1332
 
 ;;[News]
+;;	New variable mpg123-mixer-type, mpg123-mixer-maxvol.
 ;;	New hooks 'mpg123-song-started-hook and 'mpg123-song-finished-hook
 ;;	introduced. (by lenbok@gmail.com)
 ;;	
@@ -122,6 +123,11 @@
 ;;				Coding system for tag message(vorbiscomment)
 ;;	  mpg123-mixer-command	"mixer"
 ;;				Command name of mixer(FreeBSD)
+;;	  mpg123-mixer-type	(Depends on the running system)
+;;				One of 'mixer 'mixerctl 'aumix 'alsa 'apanel
+;;				'mixer.exe 'audioctl
+;;	  mpg123-mixer-maxvol	(Depends on the value of mpg123-mixer-type)
+;;				Maximum volume permitted by the mixer utility
 ;;	  mpg123-preserve-playtime t
 ;;				If you want to mpg123 to play all music
 ;;				from the beginning even if the last
@@ -354,6 +360,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.49  2007/04/19 00:05:40  yuuji
+;; New variable mpg123-mixer-type, mpg123-mixer-maxvol (by lenbok)
+;;
 ;; Revision 1.48  2007/03/21 15:06:22  yuuji
 ;; New hooks 'mpg123-song-started-hook and 'mpg123-song-finished-hook
 ;; introduced. (by lenbok@gmail.com)
@@ -532,15 +541,17 @@
 ;; \C-d (mpg123-delete-file)
 ;;
 
-(defvar mpg123-system-type
+;; Linux users still using OSS rather than ALSA may wish to use
+;; (setq mpg123-mixer-type 'aumix) before loading mpg123.el
+(defvar mpg123-mixer-type
   (cond
-   ((string-match "freebsd" (emacs-version))	'freebsd)
-   ((string-match "netbsd" (emacs-version))	'netbsd)
-   ((string-match "openbsd" (emacs-version))	'openbsd) ;not yet tested
-   ((string-match "linux" (emacs-version))	'linux)
-   ((string-match "irix" (emacs-version))	'irix)
-   ((string-match "nt[45]\\|windows9" (emacs-version)) 'nt)
-   ((string-match "solaris" (emacs-version))	'solaris)))
+   ((string-match "freebsd" (emacs-version))	'mixer)
+   ((string-match "netbsd" (emacs-version))	'mixerctl)
+   ((string-match "openbsd" (emacs-version))	'mixerctl) ;not yet tested
+   ((string-match "linux" (emacs-version))	'alsa)
+   ((string-match "irix" (emacs-version))	'apanel)
+   ((string-match "nt[45]\\|windows9" (emacs-version)) 'mixer.exe)
+   ((string-match "solaris" (emacs-version))	'audioctl)))
 
 (defvar mpg123-mpg123-command "mpg123"
   "*Command name of mpg123 player. Need 0.59q or later.
@@ -572,21 +583,28 @@ If running Emacs knows utf-8, use it.  If any, we use iso-20220jp instead.")
   "*Default file name coding system for encoding music files.")
 
 (defvar mpg123-mixer-command
-  (cdr (assq mpg123-system-type
-	     '((freebsd . "mixer") (netbsd . "mixerctl") (openbsd . "mixerctl")
-	       (linux . "aumix") (irix . "apanel -nodisplay")
-	       (solaris . "audioctl") (nt . "mixer.exe"))))
+  (cdr (assq mpg123-mixer-type
+	     '((mixer . "mixer") (mixerctl . "mixerctl")
+	       (aumix . "aumix") (apanel . "apanel -nodisplay")
+	       (audioctl . "audioctl") (nt . "mixer.exe")
+               (alsa . "amixer"))))
   "*Command name for mixer setting utility
 mixer調節用コマンド")
 (defvar mpg123-default-dir "~/mp3")
 (defvar mpg123-mixer-setvol-target-list
-  (cdr (assq mpg123-system-type
-	     '((freebsd . ("vol" "pcm")) (netbsd . ("outputs.master"))
-	       (openbsd . ("outputs.master"))
-	       (linux . ("-w")) (irix . ("-outlevels"))
-	       (solaris . ("-v")) (nt . ("-v")))))
+  (cdr (assq mpg123-mixer-type
+	     '((mixer . ("vol" "pcm")) (mixerctl . ("outputs.master"))
+	       (aumix . ("-w")) (apanel . ("-outlevels"))
+	       (audioctl . ("-v")) (nt . ("-v"))
+               (alsa . ("PCM")))))
   "*Option list for volume setting utility.
 mixer調節コマンドの音量調節オプションのリスト")
+(defvar mpg123-mixer-maxvol
+  (if (eq mpg123-mixer-type 'mixerctl) 255 
+    (if (eq mpg123-mixer-type 'alsa) 31 
+      100))
+  "*Maximum volume permitted by the mixer utility.
+mixer調節コマンドで設定できる音量最大値")
 (defvar mpg123-preserve-playtime t
   "When shift to other music, leave playing time of current music, or not")
 (defvar mpg123-id3-tag-function 'mpg123:peek-tag
@@ -1368,7 +1386,7 @@ if slider is already visible.
        ((fboundp 'code-convert-string)
 	(setq music (code-convert-string
 		     music mpg123-process-coding-system '*internal*))))
-      (and (eq mpg123-system-type 'nt)		;convert to dos filename for
+      (and (eq mpg123-mixer-type 'mixer.exe)		;convert to dos filename for
 	   (fboundp 'unix-to-dos-file-name)	;music over shared folder(Win)
 	   (setq music (unix-to-dos-file-name music)))
       (cond
@@ -2737,7 +2755,7 @@ the music will immediately move to that position."
   "Get current volume"
   (if mpg123-mixer-command
       (cond
-       ((eq mpg123-system-type 'freebsd)
+       ((eq mpg123-mixer-type 'mixer)
 	(let ((b (get-buffer-create " *mpg123 mixer* "))
 	      vol)
 	  (set-buffer b)
@@ -2750,7 +2768,7 @@ the music will immediately move to that position."
 		(setq vol (cons (string-to-int left) (string-to-int right))))
 	    (setq vol "unknown"))
 	  (setq mpg123*cur-volume vol)))
-       ((memq mpg123-system-type '(netbsd openbsd))
+       ((eq mpg123-mixer-type 'mixerctl)
 	(let ((b (get-buffer-create " *mpg123 mixer* "))
 	      vol)
 	  (set-buffer b)
@@ -2764,7 +2782,7 @@ the music will immediately move to that position."
 		(setq vol (cons (string-to-int left) (string-to-int right))))
 	    (setq vol "unknown"))
 	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-system-type 'linux)
+       ((eq mpg123-mixer-type 'aumix)
 	(let ((b (get-buffer-create " *mpg123 mixer* "))
 	      vol)
 	  (set-buffer b)
@@ -2777,7 +2795,20 @@ the music will immediately move to that position."
 		(setq vol (cons (string-to-int left) (string-to-int right))))
 	    (setq vol "unknown"))
 	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-system-type 'nt)
+       ((eq mpg123-mixer-type 'alsa)
+	(let ((b (get-buffer-create " *mpg123 mixer* "))
+	      vol)
+	  (set-buffer b)
+	  (erase-buffer)
+	  (call-process mpg123-mixer-command nil b nil "sget" "PCM")
+	  (goto-char (point-min))
+          (if (re-search-forward "Left: Playback \\([0-9]+\\).*\n.*Right: Playback \\([0-9]+\\)" nil t)
+	      (let ((left (mpg123:match-string 1))
+		    (right (mpg123:match-string 2)))
+		(setq vol (cons (string-to-int left) (string-to-int right))))
+	    (setq vol "unknown"))
+	  (setq mpg123*cur-volume vol)))
+       ((eq mpg123-mixer-type 'mixer.exe)
 	(let ((b (get-buffer-create " *mpg123 mixer* "))
 	      vol)
 	  (set-buffer b)
@@ -2790,19 +2821,21 @@ the music will immediately move to that position."
 		(setq vol (cons (string-to-int left) (string-to-int right))))
 	    (setq vol "unknown"))
 	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-system-type 'solaris)
-	"unknown"))))
+       ((eq mpg123-mixer-type 'audioctl)
+	"unknown")
+       (t 
+        "unknown"))))
 
 (defun mpg123:set-volume (vollist)
   "Set volume"
   (if (integerp vollist) (setq vollist (cons vollist vollist)))
   (if (and mpg123-mixer-command
-	   (memq mpg123-system-type
-		 '(freebsd netbsd openbsd linux solaris nt)))
+	   (memq mpg123-mixer-type
+		 '(mixer mixerctl aumix audioctl nt alsa)))
       (let*((l mpg123-mixer-setvol-target-list)
-	    (ctl-type (string-match "mixerctl" mpg123-mixer-command))
+	    (ctl-type (eq mpg123-mixer-type 'mixerctl))
 	    (v (format "%d%c%d"
-		       (car vollist) (if ctl-type ?, ?:) (cdr vollist)))
+		       (car vollist) (if (memq mpg123-mixer-type '(mixerctl alsa)) ?, ?:) (cdr vollist)))
 	    args)
 	(setq mpg123*cur-volume vollist)
 	(while l
@@ -2812,6 +2845,9 @@ the music will immediately move to that position."
 		  (cons (car l) (cons v args))))
 	  (setq l (cdr l)))
 	(if ctl-type (setq args (cons "-w" args)))
+	(if (eq mpg123-mixer-type 'alsa)
+            (setq args (cons "sset" args)))
+        ;(message (format "args: %S" args))
 	(apply 'call-process
 	       mpg123-mixer-command nil nil nil
 	       args))))
@@ -2819,17 +2855,16 @@ the music will immediately move to that position."
 (defun mpg123-volume-increase (arg)
   "Increase both(left/right) volume by ARG count."
   (interactive "p")
-  (let ((maxvol (if (string-match "mixerctl" mpg123-mixer-command) 255 100)))
-    (cond
-     ((consp mpg123*cur-volume)
-      (let ((left (car mpg123*cur-volume)) (right (cdr mpg123*cur-volume)))
-	(setq left (max 0 (min maxvol (+ arg left)))
-	      right (max 0 (min maxvol (+ arg right))))
-	(mpg123:set-volume (cons left right))))
-     ((integerp mpg123*cur-volume)
-      (let ((v (max 0 (min (+ mpg123*cur-volume arg)))))
-	(mpg123:set-volume (cons v v)))))
-    (mpg123:update-volume mpg123*cur-volume)))
+  (cond
+   ((consp mpg123*cur-volume)
+    (let ((left (car mpg123*cur-volume)) (right (cdr mpg123*cur-volume)))
+      (setq left (max 0 (min mpg123-mixer-maxvol (+ arg left)))
+            right (max 0 (min mpg123-mixer-maxvol (+ arg right))))
+      (mpg123:set-volume (cons left right))))
+   ((integerp mpg123*cur-volume)
+    (let ((v (max 0 (min (+ mpg123*cur-volume arg)))))
+      (mpg123:set-volume (cons v v)))))
+  (mpg123:update-volume mpg123*cur-volume))
 
 (defun mpg123-volume-decrease (arg)
   "Decrease both(left/right) volume by ARG count."
