@@ -1,11 +1,12 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123/ogg123
-;;; (c)1999-2006 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2007 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Thu Apr 19 09:05:12 2007 on firestorm
-;;; Update count: 1332
+;;; Last modified Mon May 28 01:17:28 2007 on firestorm
+;;; Update count: 1336
 
 ;;[News]
+;;	Drag&drop enabled by smart-dnd.el.
 ;;	New variable mpg123-mixer-type, mpg123-mixer-maxvol.
 ;;	New hooks 'mpg123-song-started-hook and 'mpg123-song-finished-hook
 ;;	introduced. (by lenbok@gmail.com)
@@ -360,6 +361,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.50  2007/05/27 16:54:19  yuuji
+;; mpg123-smart-dnd-setup
+;;
 ;; Revision 1.49  2007/04/19 00:05:40  yuuji
 ;; New variable mpg123-mixer-type, mpg123-mixer-maxvol (by lenbok)
 ;;
@@ -2912,6 +2916,16 @@ the music will immediately move to that position."
 	    (code (mpg123:get-from-file-about file "id-coding-system")))
 	(id3-edit)
 	(if code (set (make-local-variable 'id3*coding) code))))))
+
+;;;
+;; smart-dnd by zenitani
+;;;
+(defun mpg123-smart-dnd-setup () 
+  (require 'smart-dnd) 
+  (smart-dnd-setup 
+    '(("\\.\\(mp3\\|ogg\\)\\'" . (mpg123-add-new f)))))
+(if (featurep 'smart-dnd)
+    (add-hook 'mpg123-hook 'mpg123-smart-dnd-setup))
 
 ;;;
 ;; mpg123 main function
