@@ -1,15 +1,12 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123/ogg123
-;;; (c)1999-2007 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2008 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon May 28 01:17:28 2007 on firestorm
-;;; Update count: 1336
+;;; Last modified Tue May 13 00:12:55 2008 on firestorm
+;;; Update count: 1352
 
 ;;[News]
-;;	Drag&drop enabled by smart-dnd.el.
-;;	New variable mpg123-mixer-type, mpg123-mixer-maxvol.
-;;	New hooks 'mpg123-song-started-hook and 'mpg123-song-finished-hook
-;;	introduced. (by lenbok@gmail.com)
+;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
 ;;	
 ;;[Commentary]
 ;;	
@@ -284,83 +281,88 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2007/3現在)。
+;;	下のアドレスまでお願いします(2008/5現在)。
 ;;							yuuji@gentei.org
 ;;[Acknowledgements]
 ;;	
-;;	Tijs van Bakel, <smoke@casema.net>
+;;	Tijs van Bakel, <smoke>at<casema.net>
 ;;		Reported mpg123 termination problem on mpg123 0.59r on
 ;;		linux 2.2.10.
-;;	sen_ml@eccosys.com
+;;	sen_ml>at<eccosys.com
 ;;		Reported problem at playing music more than 100.
-;;	Kenichi OKADA, <okada@opaopa.org>
+;;	Kenichi OKADA, <okada>at<opaopa.org>
 ;;		Sent a patch of setting sound volume on Solaris/sparc.
-;;	Takuro Horikawa <takuroho@tky3.3web.ne.jp>
+;;	Takuro Horikawa <takuroho>at<tky3.3web.ne.jp>
 ;;		Reported running on WinNT.
 ;;		Port `mixer command' to Windows.
 ;;		(See http://www3.tky.3web.ne.jp/~takuroho/mpg123.html)
-;;	TAOKA Satoshi <taoka@infonets.hiroshima-u.ac.jp>
+;;	TAOKA Satoshi <taoka>at<infonets.hiroshima-u.ac.jp>
 ;;		Put mpg123.el into FreeBSD ports collection
-;;	T. V. Raman <ramantv@earthlink.net>
+;;	T. V. Raman <ramantv>at<earthlink.net>
 ;;		Made emacspeak-mpg123.el.  Many comments.
-;;	Per Weijnitz <Per.Weijnitz@etl.ericsson.se>
+;;	Per Weijnitz <Per.Weijnitz>at<etl.ericsson.se>
 ;;		Sent a patch to enable mixer command on NT4
-;;	Takayuki TSUKAGOSHI <tsuka@soft.ics.keio.ac.jp>
+;;	Takayuki TSUKAGOSHI <tsuka>at<soft.ics.keio.ac.jp>
 ;;		Sent a patch for mule2@19.34.
-;;	Ryuichi Arafune <arafune@debian.org>
+;;	Ryuichi Arafune <arafune>at<debian.org>
 ;;		Put mpg123.el to Debian package.
-;;	Laurent Martelli <martelli@iie.cnam.fr>
+;;	Laurent Martelli <martelli>at<iie.cnam.fr>
 ;;		Sent a patch of passing optional arguments to mpg123.
 ;;		Volume control for Linux.
-;;	T. Amano <tomoo@cheri.sh>
+;;	T. Amano <tomoo>at<cheri.sh>
 ;;		Reported running on Linux.
-;;	OHTAKI Naoto <ohtaki@wig.nu>
+;;	OHTAKI Naoto <ohtaki>at<wig.nu>
 ;;		Reported running on Windows98
-;;	MOROHOSHI Akihiko <moro@remus.dti.ne.jp>
+;;	MOROHOSHI Akihiko <moro>at<remus.dti.ne.jp>
 ;;		Sent a patch on coding-system detection for XEmacs+emu.el
 ;;		Fixed the failure of handling multi-byte chars in
 ;;		id3v1.1 support.
 ;;		Introduce mpg123-lazy-slider.
-;;	Alex Shinn <foof@debian.org>
+;;	Alex Shinn <foof>at<debian.org>
 ;;		Patch to handle mp3 files in multiple directories.
 ;;		Implemented `playlist'.
-;;	Seiichi Namba <sn@asahi-net.email.ne.jp>
+;;	Seiichi Namba <sn>at<asahi-net.email.ne.jp>
 ;;		Many collaboration codes for working with dired-dd.
 ;;		Made dired-dd-mpg123.
-;;	Serge Arsenault <boggles@openface.ca>
+;;	Serge Arsenault <boggles>at<openface.ca>
 ;;		Sent information on OpenBSD.
-;;	Toni Ronkko <tronkko@hytti.uku.fi>
+;;	Toni Ronkko <tronkko>at<hytti.uku.fi>
 ;;		Many suggestions.
-;;	SHIMADA Mitsunobu <simm@mbox.fan.gr.jp>
+;;	SHIMADA Mitsunobu <simm>at<mbox.fan.gr.jp>
 ;;		Sent a patch of mpg123-auto-redraw and truncate-lines.
-;;	N. SHIMIZU <CZA06074@nifty.com>
+;;	N. SHIMIZU <CZA06074>at<nifty.com>
 ;;		Sent a patch to restore cursor position after id3-edit.
-;;	HIROSE Yoshihide <yoshihide@fast.co.jp>
+;;	HIROSE Yoshihide <yoshihide>at<fast.co.jp>
 ;;		Report and sent a patch for IRIX6.
-;;	Andreas Fuchs <asf@acm.org>
+;;	Andreas Fuchs <asf>at<acm.org>
 ;;		Support OggVorbis.
-;;	Akinori MUSHA <knu@iDaemons.org>
+;;	Akinori MUSHA <knu>at<iDaemons.org>
 ;;		Sent a patch to read oggcomment correctly
-;;	Yoichi NAKAYAMA <yoichi@eken.phys.nagoya-u.ac.jp>
+;;	Yoichi NAKAYAMA <yoichi>at<eken.phys.nagoya-u.ac.jp>
 ;;		Fixed the bug when mpg123*use-face is nil.
 ;;		Fixed handling of mpg123*initial-buffer.
-;;	Len Trigg <lenbok@myrealbox.com>
+;;	Len Trigg <lenbok>at<myrealbox.com>
 ;;		Sent a patch and report on playlist file parsing.
 ;;		Remote control stuffs.
 ;;		Hooks for helper application.
-;;	Rene Kyllingstad <kyllingstad@users.sourceforge.net>
+;;	Rene Kyllingstad <kyllingstad>at<users.sourceforge.net>
 ;;		Many enhancements; mpg123-set-point-for-next-song-function,
 ;;		mpg123-format-name-function, using SIGTERM, id3v1.1,
 ;;		mpg123-now-playing, fixes for non-mule XEmacs.
-;;	Hiroshi Imai <imai_hiroshi_niboshi@yahoo.co.jp>
+;;	Hiroshi Imai <imai_hiroshi_niboshi>at<yahoo.co.jp>
 ;;		Suggested not to alter mixer volume in mpg123:initialize
 ;;		when mpg123-startup-volume is nil.
-;;	Faraz Shahbazker <faraz.shahbazker@gmail.com>
+;;	Faraz Shahbazker <faraz.shahbazker>at<gmail.com>
 ;;		Sent a patch of new feature, `loop counter'.
+;;	Thomas Morgan <tlm>at<thomasmorgan.net>
+;;	       Suggestion on mpg123-quit.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.51  2008/05/12 15:14:46  yuuji
+;; Fix behavior of mpg123-quit.
+;;
 ;; Revision 1.50  2007/05/27 16:54:19  yuuji
 ;; mpg123-smart-dnd-setup
 ;;
@@ -2179,16 +2181,18 @@ When called from function, optional argument COMMAND directly select the job."
   "Quit"
   (interactive)
   (let ((p (get-buffer-process (current-buffer)))
-	(buffers (list mpg123*buffer mpg123*info-buffer
+	(buffers (list mpg123*buffer mpg123*info-buffer mpg123*stack-buffer
 		  " *mpg123tmp* " " *mpg123 tag tmp*" " *mpg123 mixer* ")))
     (if (and p
 	     (eq (process-status p) 'run)
 	     (or yes (y-or-n-p "Kill current music?")))
 	(mpg123:sure-kill p)
       (setq buffers (delete mpg123*buffer buffers))
+      (bury-buffer mpg123*buffer)
       (if (buffer-name mpg123*initial-buffer) ;buffer-live-p check(mule2 OK)
 	  (switch-to-buffer mpg123*initial-buffer)))
     (setq mpg123*interrupt-p 'quit)
+    (message "")
     (mapcar '(lambda (b) (and (get-buffer b) (kill-buffer b))) buffers)))
 
 (defun mpg123-quit-yes ()
@@ -2930,8 +2934,8 @@ the music will immediately move to that position."
 ;;;
 ;; mpg123 main function
 ;;;
-(defun mpg123 (file)
-  "Call mpg123 on file"
+(defun mpg123-prepare-buffer (file)
+  "Prepare mpg123 buffer on FILE."
   (interactive "i")
   (let*((defaultdir (if (file-directory-p mpg123-default-dir)
 			mpg123-default-dir
@@ -2960,7 +2964,22 @@ the music will immediately move to that position."
 			       (file-name-directory file)))
     (mpg123:create-buffer files)
     (message "Let's listen to the music. Type SPC to start.")
-    (setq mpg123*music-in-stack nil)
+    (setq mpg123*music-in-stack nil)))
+
+(defun mpg123 (file)
+  "Call mpg123 on file"
+  (interactive "i")
+  (let (p)
+    (if (and (get-buffer mpg123*buffer)
+	     (setq p (get-buffer-process mpg123*buffer))
+	     (eq (process-status p) 'run))
+	(progn
+	  (switch-to-buffer mpg123*buffer)
+	  (message (mpg123:lang-msg
+		    "To open new music files type `%s'."
+		    "別の音楽ファイル開くなら %s 押すべし.")
+		   (substitute-command-keys "\\[mpg123-open-new]")))
+      (mpg123-prepare-buffer file))
     (run-hooks 'mpg123-hook)))
 
 (if (and mpg123-process-coding-system (symbolp mpg123-process-coding-system))
