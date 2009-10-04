@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2008 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Tue May 13 00:12:55 2008 on firestorm
-;;; Update count: 1352
+;;; Last modified Sat Feb 28 05:48:22 2009 on firestorm
+;;; Update count: 1353
 
 ;;[News]
 ;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
@@ -360,6 +360,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.52  2009/10/04 12:22:32  yuuji
+;; Check: (fboundp 'set-buffer-multibyte)
+;;
 ;; Revision 1.51  2008/05/12 15:14:46  yuuji
 ;; Fix behavior of mpg123-quit.
 ;;
@@ -922,6 +925,7 @@ If optional argument PATTERN given, search it(tentative)."
 			      "\000-\177"
 			    "^\xff")))
 	   (set-buffer b)
+	   (if (fboundp 'set-buffer-multibyte) (set-buffer-multibyte nil))
 	   (erase-buffer)
 	   (insert "..")		;dummy dot to simplify the while loop
 	   (mpg123:insert-raw-file-contents f nil 0 mpg123-mp3-scan-bytes)
