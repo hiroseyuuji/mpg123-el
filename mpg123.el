@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2008 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Feb 28 05:48:22 2009 on firestorm
-;;; Update count: 1353
+;;; Last modified Thu Feb 18 13:03:05 2010 on duke
+;;; Update count: 1357
 
 ;;[News]
 ;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
@@ -360,6 +360,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.53  2010/02/18 04:04:08  yuuji
+;; New customizing variable mpg123-mixer-mixerctl-target
+;;
 ;; Revision 1.52  2009/10/04 12:22:32  yuuji
 ;; Check: (fboundp 'set-buffer-multibyte)
 ;;
@@ -600,12 +603,20 @@ If running Emacs knows utf-8, use it.  If any, we use iso-20220jp instead.")
   "*Command name for mixer setting utility
 mixer調節用コマンド")
 (defvar mpg123-default-dir "~/mp3")
+(defvar mpg123-mixer-mixerctl-target "outputs.master"
+  "*Target name of mixerctl for setting master volume.
+This value might varies among various hardware.  Set proper value
+on every host.
+mixerctlでボリューム設定する場合の値. 各NetBSDホストごとに設定すべき。")
 (defvar mpg123-mixer-setvol-target-list
   (cdr (assq mpg123-mixer-type
-	     '((mixer . ("vol" "pcm")) (mixerctl . ("outputs.master"))
-	       (aumix . ("-w")) (apanel . ("-outlevels"))
-	       (audioctl . ("-v")) (nt . ("-v"))
-               (alsa . ("PCM")))))
+	     (list '(mixer . ("vol" "pcm"))
+		   (cons 'mixerctl (list mpg123-mixer-mixerctl-target))
+		   '(aumix . ("-w"))
+		   '(apanel . ("-outlevels"))
+		   '(audioctl . ("-v"))
+		   '(nt . ("-v"))
+		   '(alsa . ("PCM")))))
   "*Option list for volume setting utility.
 mixer調節コマンドの音量調節オプションのリスト")
 (defvar mpg123-mixer-maxvol
