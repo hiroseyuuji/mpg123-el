@@ -1,9 +1,9 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123/ogg123
-;;; (c)1999-2008 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2010 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Thu Feb 18 13:03:05 2010 on duke
-;;; Update count: 1357
+;;; Last modified Fri Mar 12 00:07:20 2010 on firestorm
+;;; Update count: 1366
 
 ;;[News]
 ;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
@@ -360,6 +360,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.54  2010/03/11 15:31:08  yuuji
+;; For emacs-23, try best to keep playing music line and time-slider visible.
+;;
 ;; Revision 1.53  2010/02/18 04:04:08  yuuji
 ;; New customizing variable mpg123-mixer-mixerctl-target
 ;;
@@ -1224,6 +1227,19 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 
 (defsubst mpg123:null ())
 
+(defun mpg123:get-largest-buffer-window (buffer min frame)
+  "Needed for Emacs-23 or later"
+  (if (fboundp 'get-buffer-window-list)
+      (let ((wl (get-buffer-window-list buffer min frame))
+	    (maxh 0) (mw nil))
+	(while wl
+	  (if (> (window-height (car wl)) maxh)
+	      (setq mw (car wl)
+		    maxh (window-height mw)))
+	  (setq wl (cdr wl)))
+	(or mw (get-buffer-window buffer t)))
+    (get-buffer-window buffer t)))
+
 (defun mpg123:sentinel (proc state)
   (cond
    ((string-match "^finished" state)
@@ -1237,8 +1253,11 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
       (if (eq (get-buffer mpg123*buffer)
               (marker-buffer mpg123*cur-play-marker))
           (let ((cb (current-buffer)) (sw (selected-window))
+		(viswin (mpg123:get-largest-buffer-window mpg123*buffer nil t))
 		(sf (selected-frame)) mp3w p)
-            (set-buffer mpg123*buffer)
+	    (if viswin
+		(select-window viswin)
+	      (set-buffer mpg123*buffer))
             (goto-char mpg123*cur-play-marker)
             (run-hooks 'mpg123-song-finished-hook)
 	    (or (and (fboundp mpg123-set-point-for-next-song-function)
@@ -1263,13 +1282,13 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 			(goto-char p)
 			(message "Next music")
 			(sit-for (string-to-number "0.1"))
-			(mpg123:play))
-		      (select-frame sf)
-		      (select-window sw)
-		      (switch-to-buffer cb))
+			(mpg123:play)))
 		  ;; Emacs20 or later, simply play it.
 		  (mpg123:play))
-	      (put 'mpg123:sentinel 'current-buffer nil))))))
+	      (put 'mpg123:sentinel 'current-buffer nil)
+	      (select-frame sf)
+	      (select-window sw)
+	      (switch-to-buffer cb))))))
    ((string-match "^hangup" state)
     (setq mpg123*interrupt-p nil))))
 
@@ -2039,7 +2058,9 @@ percentage in the length of the song etc.
   (interactive)
   (let*((selw (selected-window))
 	(cb (current-buffer))
-	(mpgw (get-buffer-window mpg123*buffer t))
+	(mpgw (if (eq (window-buffer selw) mpg123*buffer)
+		  selw
+		(mpg123:get-largest-buffer-window mpg123*buffer nil t)))
 	;(mpgf (window-frame mpgw))
 	mpgwinlist nowvisible needed-lines numlines (numwin 1)
 	w redrawp (i 300))
@@ -2082,7 +2103,10 @@ percentage in the length of the song etc.
 		(mpg123:delete-windows mpgwinlist)))
 	   ((eq mpg123-display-slider 'always)
 	    (if (> numwin 1)
-		nil
+		(progn
+		  (select-window (car mpgwinlist))
+		  (set-window-start
+		   nil (overlay-start mpg123*indicator-overlay)))
 	      (mpg123:display-slider-sub)))
 	   (t
 	    ;; mpg123*buffer window is selected here.
