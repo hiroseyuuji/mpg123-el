@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2010 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Mar 12 00:07:20 2010 on firestorm
-;;; Update count: 1366
+;;; Last modified Thu Apr  1 14:49:48 2010 on firestorm
+;;; Update count: 1370
 
 ;;[News]
 ;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
@@ -355,11 +355,16 @@
 ;;	Faraz Shahbazker <faraz.shahbazker>at<gmail.com>
 ;;		Sent a patch of new feature, `loop counter'.
 ;;	Thomas Morgan <tlm>at<thomasmorgan.net>
-;;	       Suggestion on mpg123-quit.
+;;		Suggestion on mpg123-quit.
+;;	Peter Lazar <pgl>at<bok.net>
+;;		Suggestion on new keybindings '='.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.55  2010/04/01 05:50:30  yuuji
+;; "=" key also increase volume. (by pgl)
+;;
 ;; Revision 1.54  2010/03/11 15:31:08  yuuji
 ;; For emacs-23, try best to keep playing music line and time-slider visible.
 ;;
@@ -696,6 +701,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (define-key mpg123-mode-map "w" 'mpg123-where-is-mark)
 (define-key mpg123-mode-map "-" 'mpg123-volume-decrease)
 (define-key mpg123-mode-map "+" 'mpg123-volume-increase)
+(define-key mpg123-mode-map "=" 'mpg123-volume-increase)
 (define-key mpg123-mode-map "v" 'mpg123-volume-decrease)
 (define-key mpg123-mode-map "V" 'mpg123-volume-increase)
 (define-key mpg123-mode-map "f" 'mpg123-forward)
