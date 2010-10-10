@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2010 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Thu Apr  1 14:49:48 2010 on firestorm
-;;; Update count: 1370
+;;; Last modified Sat Oct  9 08:55:41 2010 on firestorm
+;;; Update count: 1374
 
 ;;[News]
 ;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
@@ -362,6 +362,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.56  2010/10/10 08:15:19  yuuji
+;; Omit "Unknown artist"
+;;
 ;; Revision 1.55  2010/04/01 05:50:30  yuuji
 ;; "=" key also increase volume. (by pgl)
 ;;
@@ -2330,6 +2333,7 @@ When called from function, optional argument COMMAND directly select the job."
   (let ((sz (nth 7 (file-attributes (file-truename file))))
 	(b (get-buffer-create " *mpg123 tag tmp*"))
 	(file-name-coding-system mpg123-file-name-coding-system)
+	(case-fold-search nil)
 	title artist album tracknum)
     (save-excursion
       (set-buffer b)
@@ -2372,7 +2376,8 @@ When called from function, optional argument COMMAND directly select the job."
 	      (concat (if (string< "" title) title
 			(file-name-nondirectory file))
 		      (if (or mpg123-omit-id3-artist
-			      (string= artist ""))
+			      (string= artist "")
+			      (string-match "[Uu]nknown [Aa]rtist" artist))
 			  ""
 			(concat " by " artist)))))
 	(kill-buffer b)
@@ -2471,7 +2476,6 @@ cf. NetBSD:/usr/share/misc/magic
 ##>>>>(109.l+113)       lelong          >0              \b, %lu comments"
 
   (let ((tmpbuf (get-buffer-create " *mpg123 tag tmp* "))
-	(case-fold-search t)
 	blen versionlen num-comments comment-len
 	(ofs 84) (peekbytes 256)	;is 256 enough??
 	(basename (file-name-nondirectory file))
