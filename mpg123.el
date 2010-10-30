@@ -2,8 +2,8 @@
 ;;; A front-end program to mpg123/ogg123
 ;;; (c)1999-2010 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Oct  9 08:55:41 2010 on firestorm
-;;; Update count: 1374
+;;; Last modified Sat Oct 30 09:49:14 2010 on firestorm
+;;; Update count: 1376
 
 ;;[News]
 ;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
@@ -362,6 +362,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.57  2010/10/30 00:51:04  yuuji
+;; "Unknown artist" suppression also for ogg.
+;;
 ;; Revision 1.56  2010/10/10 08:15:19  yuuji
 ;; Omit "Unknown artist"
 ;;
@@ -2443,6 +2446,8 @@ Optional 4th arg OFFSET is added to BEGIN and END."
 		     (format "%02d:%02d"
 			     (string-to-int (mpg123:match-string 1))
 			     (string-to-int (mpg123:match-string 2)))))
+	    (if (string-match "[Uu]nknown [Aa]rtist" artist)
+		(setq artist ""))
 	    (if (string< "" artist)
 		(setq artist (concat " by " artist)))
 	    ;; The next formatted string is return value
