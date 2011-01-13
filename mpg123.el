@@ -1,9 +1,9 @@
 ;;; -*- Emacs-Lisp -*-
 ;;; A front-end program to mpg123/ogg123
-;;; (c)1999-2010 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2011 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Sat Oct 30 09:49:14 2010 on firestorm
-;;; Update count: 1376
+;;; Last modified Fri Jan 14 08:01:00 2011 on firestorm
+;;; Update count: 1380
 
 ;;[News]
 ;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
@@ -281,7 +281,7 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2008/5現在)。
+;;	下のアドレスまでお願いします(2011/1現在)。
 ;;							yuuji@gentei.org
 ;;[Acknowledgements]
 ;;	
@@ -358,10 +358,15 @@
 ;;		Suggestion on mpg123-quit.
 ;;	Peter Lazar <pgl>at<bok.net>
 ;;		Suggestion on new keybindings '='.
+;;	Vagn Johansen <vj>at<evalesco.net>
+;;		Sent a patch for handling big mp3 files.
 ;;
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.58  2011/01/13 23:02:27  yuuji
+;; Fix calculation overflow(int) in mpg123:time2frame. (thanks to vj)
+;;
 ;; Revision 1.57  2010/10/30 00:51:04  yuuji
 ;; "Unknown artist" suppression also for ogg.
 ;;
@@ -1331,7 +1336,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	  (setq ratio-f frames
 		ratio-s (+ (* 60 (string-to-number lmin))
 			   (string-to-number lsec)))))
-    (format "%d" (/ (* total ratio-f) ratio-s))))
+    (format "%d" (/ (* 1.0 total ratio-f) ratio-s))))
 
 (defun mpg123:in-music-list-p ()
   (and (equal mpg123*buffer (buffer-name))
