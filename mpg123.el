@@ -1,14 +1,10 @@
-;;; -*- Emacs-Lisp -*-
-;;; A front-end program to mpg123/ogg123
-;;; (c)1999-2011 by HIROSE Yuuji [yuuji@gentei.org]
+;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
+;;; (c)1999-2012 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Fri Jan 14 08:01:00 2011 on firestorm
-;;; Update count: 1380
+;;; Last modified Mon Dec  3 07:57:51 2012 on firestorm
+;;; Update count: 1382
 
-;;[News]
-;;	Calling mpg123 when playing switches buffer to mpg123 buffer.
-;;	
-;;[Commentary]
+;;; Commentary:
 ;;	
 ;;	This package is a front-end program to mpg123/ogg123 audio player.
 ;;	mpg123/ogg123 の再生フロントエンドです。
@@ -364,6 +360,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.59  2012/12/02 23:00:26  yuuji
+;; Change header and section tags.  Nothing changed in codes.
+;;
 ;; Revision 1.58  2011/01/13 23:02:27  yuuji
 ;; Fix calculation overflow(int) in mpg123:time2frame. (thanks to vj)
 ;;
@@ -571,6 +570,8 @@
 ;; 日本語ファイル名対応(たぶん)
 ;; \C-d (mpg123-delete-file)
 ;;
+
+;;; Code:
 
 ;; Linux users still using OSS rather than ALSA may wish to use
 ;; (setq mpg123-mixer-type 'aumix) before loading mpg123.el
