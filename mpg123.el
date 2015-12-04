@@ -1,8 +1,8 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
-;;; (c)1999-2012 by HIROSE Yuuji [yuuji@gentei.org]
+;;; (c)1999-2015 by HIROSE Yuuji [yuuji@gentei.org]
 ;;; $Id$
-;;; Last modified Mon Dec  3 07:57:51 2012 on firestorm
-;;; Update count: 1382
+;;; Last modified Fri Dec  4 19:03:46 2015 on firestorm
+;;; Update count: 1386
 
 ;;; Commentary:
 ;;	
@@ -277,7 +277,7 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2011/1現在)。
+;;	下のアドレスまでお願いします(2015/12現在)。
 ;;							yuuji@gentei.org
 ;;[Acknowledgements]
 ;;	
@@ -360,6 +360,9 @@
 ;;
 ;;[History]
 ;; $Log$
+;; Revision 1.60  2015/12/04 10:05:43  yuuji
+;; Fix error when ogg3info returns no music length.
+;;
 ;; Revision 1.59  2012/12/02 23:00:26  yuuji
 ;; Change header and section tags.  Nothing changed in codes.
 ;;
@@ -2430,7 +2433,7 @@ Optional 4th arg OFFSET is added to BEGIN and END."
 	(process-coding-system-alist
 	 (list (cons mpg123-program-ogginfo (cons eucjp eucjp))))
 	(buf (get-buffer-create " *mpg123tmp"))
-	title artist
+	(title "") (artist "")
 	(oldenv (getenv "LC_CTYPE")))
     (unwind-protect
 	(progn
@@ -2446,7 +2449,7 @@ Optional 4th arg OFFSET is added to BEGIN and END."
 		   (mpg123:match-string 3)))
 	    ;; Get Music Length here :)
 	    (if (re-search-backward
-		 "length: \\([0-9]+\\)m.\\([0-9]+\\)s"
+		 "length: \\([0-9]+\\)m.\\([.0-9]+\\)s"
 		 nil t)
 		(put 'mpg123:add-musiclist-to-point 'length
 		     (format "%02d:%02d"
