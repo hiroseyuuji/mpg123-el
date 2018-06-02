@@ -1,6 +1,6 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
 ;;; (c)1999-2015 by HIROSE Yuuji [yuuji@gentei.org]
-;;; $Id$
+;;; $Id: mpg123.el,v 1.61 2017/02/21 08:06:31 yuuji Exp $
 ;;; Last modified Fri Dec  4 19:03:46 2015 on firestorm
 ;;; Update count: 1386
 
@@ -359,7 +359,7 @@
 ;;
 ;;
 ;;[History]
-;; $Log$
+;; $Log: mpg123.el,v $
 ;; Revision 1.61  2017/02/21 08:06:31  yuuji
 ;; Summary: string-to-int -> string-to-number
 ;;
