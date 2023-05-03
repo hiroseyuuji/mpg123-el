@@ -1,8 +1,8 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
 ;;; (c)1999-2023 by HIROSE Yuuji [yuuji>at<gentei.org]
-;;; $Id: mpg123.el,v 1.62 2023/05/03 04:04:12 yuuji Exp $
-;;; Last modified Wed May  3 12:08:44 2023 on firestorm
-;;; Update count: 1419
+;;; $Id: mpg123.el,v 1.63 2023/05/03 05:54:13 yuuji Exp $
+;;; Last modified Wed May  3 14:51:55 2023 on firestorm
+;;; Update count: 1422
 
 ;;; Commentary:
 ;;	
@@ -361,6 +361,9 @@
 ;;
 ;;[History]
 ;; $Log: mpg123.el,v $
+;; Revision 1.63  2023/05/03 05:54:13  yuuji
+;; Summary: (Rollback) Focus-frame not needed for non-XEmacs, dropped.
+;;
 ;; Revision 1.62  2023/05/03 04:04:12  yuuji
 ;; Summary: Get working again for recent environment after long absence!
 ;;
@@ -842,7 +845,6 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (fset 'mpg123:focus-frame
       (cond
        ((fboundp 'focus-frame) 'focus-frame)
-       ((fboundp 'x-focus-frame) 'x-focus-frame)
        (t (function (lambda (&rest ignore) nil)))))
 
 (fset 'mpg123:substring
