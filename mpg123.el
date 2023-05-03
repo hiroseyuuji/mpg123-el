@@ -1,8 +1,8 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
-;;; (c)1999-2015 by HIROSE Yuuji [yuuji@gentei.org]
-;;; $Id: mpg123.el,v 1.61 2017/02/21 08:06:31 yuuji Exp $
-;;; Last modified Fri Dec  4 19:03:46 2015 on firestorm
-;;; Update count: 1386
+;;; (c)1999-2023 by HIROSE Yuuji [yuuji>at<gentei.org]
+;;; $Id: mpg123.el,v 1.62 2023/05/03 04:04:12 yuuji Exp $
+;;; Last modified Wed May  3 12:08:44 2023 on firestorm
+;;; Update count: 1419
 
 ;;; Commentary:
 ;;	
@@ -107,6 +107,7 @@
 ;;				Command name of mpg123
 ;;	  mpg123-mpg123-command-args	nil
 ;;				Argument list to pass mpg123 command
+;;				eg.for setting scale factor:  '("-f 3000")
 ;;	  mpg123-mpg123-id-coding-system	undefined
 ;;				Coding system for mp3 tag message
 ;;	  mpg123-ogg123-command	"ogg123"
@@ -360,6 +361,9 @@
 ;;
 ;;[History]
 ;; $Log: mpg123.el,v $
+;; Revision 1.62  2023/05/03 04:04:12  yuuji
+;; Summary: Get working again for recent environment after long absence!
+;;
 ;; Revision 1.61  2017/02/21 08:06:31  yuuji
 ;; Summary: string-to-int -> string-to-number
 ;;
@@ -616,6 +620,9 @@ If running Emacs knows utf-8, use it.  If any, we use iso-20220jp instead.")
 
 (defvar mpg123-file-name-coding-system
   (cond
+   ((and (boundp 'default-file-name-coding-system)
+	 default-file-name-coding-system)
+    default-file-name-coding-system)
    ((coding-system-p 'euc-jp) 'euc-jp)
    ((coding-system-p '*euc-japan*) '*euc-japan*))
   "*Default file name coding system for encoding music files.")
@@ -791,7 +798,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*loop-count-marker nil)
 ;(defvar mpg123-playlist-regexp ".*\\.m3u"
 ;  "*Regular expression to match to playlist files")
-(defvar mpg123-url-regexp "http://.*"
+(defvar mpg123-url-regexp "https?://.*"
   "*Regular expression to match to URL requests")
 
 (defvar mpg123-mpg123-time-regexp  "Time: \\(..:..\\)... +\\[\\(..:..\\)")
@@ -832,11 +839,23 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 		     (ceiling (string-to-number string base))))
 	'string-to-int))
 
-(defun mpg123:match-string (n &optional m)
+(fset 'mpg123:focus-frame
+      (cond
+       ((fboundp 'focus-frame) 'focus-frame)
+       ((fboundp 'x-focus-frame) 'x-focus-frame)
+       (t (function (lambda (&rest ignore) nil)))))
+
+(fset 'mpg123:substring
+      (if (fboundp 'substring-no-properties)
+          'substring-no-properties
+        'substing))
+
+(defun mpg123:match-string (n &optional m str)
   "Return (buffer-substring (match-beginning N) (match-beginning (or M N)))."
   (if (match-beginning n)
-      (mpg123:buffer-substring (match-beginning n)
-			(match-end (or m n)))))
+      (if str (mpg123:substring str (match-beginning n) (match-end (or m n)))
+	(mpg123:buffer-substring (match-beginning n)
+				 (match-end (or m n))))))
 
 (defun mpg123-now-playing ()
   "Return name of song currently playing in mpg123, or nil"
@@ -1161,10 +1180,25 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 確認してみれ。
 (スペースキーでオサラバ)
 ***********************************************************" (point)))
-  
+
+(defun mpg123:adjust-output (mess)
+  "Convert new mpg123 status line to old one if needed."
+  ;; [[WORKAROUND]]
+  ;; Keyboard controllable mpg123 returns newer format.
+  ;; Convert status line to old-style one.
+  (if (string-match "[>_=] \\([0-9]+\\)\\+\\([0-9]+\\) +\\([0-9:.]+\\)\\+\\([0-9:.]+\\) \\(.*\\)" mess)
+      (format "Frame# %7s [%7s], Time: %s [%s] %s"
+	      (mpg123:match-string 1 1 mess)
+	      (mpg123:match-string 2 2 mess)
+	      (mpg123:match-string 3 3 mess)
+	      (mpg123:match-string 4 4 mess)
+	      (mpg123:match-string 5 5 mess))
+    mess))
+
 (defun mpg123:initial-filter (proc mess)
   "mpg123 process filter No.1, called at startup of mpg123."
   (let ((targetfile mpg123*cur-music-file))
+    (setq mess (mpg123:adjust-output mess))
     (if (string-match "Can't open /dev" mess)
 	(progn
 	  (set-process-filter proc nil)
@@ -1206,12 +1240,18 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 ;; 		  (+ left column 1)
 ;; 		  (overlay-buffer mpg123*slider-overlay))))
 
+;; Recent mpg123 switched status line format
+;; > 00088+11671  00:02.29+05:04.87 --- 009=009 128 kb/s  418 B acc    0 clip
+;; So convert modern line to traditional one below
+;; Frame# 00088 [ 11671], Time: 00:02.29 [05:04.87] --- 009=009 ....
+
 (defun mpg123:filter (proc mess)
   (if (stringp mess)
-      (save-excursion
+      (save-excursion ;;Emacs automatically saves match-data in process filter
 	;;(set-buffer mpg123*info-buffer)  ;heavy
 	;;(insert mess)                    ;jobs
 	(let ((update-slider (not mpg123-lazy-slider)))
+	  (setq mess (mpg123:adjust-output mess))
 	  (if (string-match mpg123:time-regexp mess)
 	      (let ((s (substring mess (match-beginning 1) (match-end 1))) mp)
 		(and (not (string= s mpg123*cur-playtime))
@@ -1455,7 +1495,10 @@ if slider is already visible.
       (cond
        ((fboundp 'code-convert-string)
 	(setq music (code-convert-string
-		     music mpg123-process-coding-system '*internal*))))
+		     music mpg123-process-coding-system '*internal*)))
+       ((fboundp 'encode-coding-string)
+	(setq music (encode-coding-string
+		     music mpg123-file-name-coding-system))))
       (and (eq mpg123-mixer-type 'mixer.exe)		;convert to dos filename for
 	   (fboundp 'unix-to-dos-file-name)	;music over shared folder(Win)
 	   (setq music (unix-to-dos-file-name music)))
@@ -2149,7 +2192,7 @@ percentage in the length of the song etc.
       ;; for XEmacs, select previous window
       (if selw
 	  (progn
-	    (focus-frame (window-frame selw))
+	    (mpg123:focus-frame (window-frame selw))
 	    (select-window selw)
 	    (sit-for 0))))))
 
