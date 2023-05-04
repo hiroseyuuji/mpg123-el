@@ -1,8 +1,8 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
 ;;; (c)1999-2023 by HIROSE Yuuji [yuuji>at<gentei.org]
-;;; $Id: mpg123.el,v 1.63 2023/05/03 05:54:13 yuuji Exp $
-;;; Last modified Wed May  3 14:51:55 2023 on firestorm
-;;; Update count: 1422
+;;; $Id: mpg123.el,v 1.63 2023/05/03 05:54:13 yuuji Exp yuuji $
+;;; Last modified Thu May  4 21:01:04 2023 on firestorm
+;;; Update count: 1513
 
 ;;; Commentary:
 ;;	
@@ -590,6 +590,7 @@
 ;; (setq mpg123-mixer-type 'aumix) before loading mpg123.el
 (defvar mpg123-mixer-type
   (cond
+   ((executable-find "mplayer")			'mplayer)
    ((string-match "freebsd" (emacs-version))	'mixer)
    ((string-match "netbsd" (emacs-version))	'mixerctl)
    ((string-match "openbsd" (emacs-version))	'mixerctl) ;not yet tested
@@ -598,6 +599,12 @@
    ((string-match "nt[45]\\|windows9" (emacs-version)) 'mixer.exe)
    ((string-match "solaris" (emacs-version))	'audioctl)))
 
+(defvar mpg123-startup-volume 30
+  "*Default sound volume at startup of this program.
+mpg123.el初回起動時の音量のデフォルト値.")
+(defvar mpg123-default-repeat 0
+  "*Default number of repetition of through playing.
+再生のデフォルトのリピート回数")
 (defvar mpg123-mpg123-command "mpg123"
   "*Command name of mpg123 player. Need 0.59q or later.
 mpg123のコマンド名。0.59qが必要。")
@@ -620,6 +627,12 @@ ogg123のコマンド名")
 	     (t nil)))
   "Preferred coding system of vorbisogg comment tag.
 If running Emacs knows utf-8, use it.  If any, we use iso-20220jp instead.")
+(defvar mpg123-mplayer-command "mplayer"
+  "*Command name of MPlayer.
+MPlayerのコマンド名")
+(defvar mpg123-mplayer-command-args nil
+  ;;'("-vo null")	;<- example
+  "*Arguments given to mplayer")
 
 (defvar mpg123-file-name-coding-system
   (cond
@@ -628,7 +641,8 @@ If running Emacs knows utf-8, use it.  If any, we use iso-20220jp instead.")
     default-file-name-coding-system)
    ((coding-system-p 'euc-jp) 'euc-jp)
    ((coding-system-p '*euc-japan*) '*euc-japan*))
-  "*Default file name coding system for encoding music files.")
+  "*Default file name coding system for encoding music files.
+If you have two or more file name coding groups, set this to nil.")
 
 (defvar mpg123-mixer-command
   (cdr (assq mpg123-mixer-type
@@ -672,19 +686,8 @@ Called when changing songs to allow playing in non-playlist order.
 1曲終わったときに次の曲の位置にポイントを動かす関数.
 プレイリストの並びとは違う再生順序にしたいときに、
 ポイントを移動する関数を定義してその関数名をこの変数に入れよう。")
-(defvar mpg123-startup-volume 30
-  "*Default sound volume at startup of this program.
-mpg123.el初回起動時の音量のデフォルト値.")
-(defvar mpg123-default-repeat 0
-  "*Default number of repetition of through playing.
-再生のデフォルトのリピート回数")
 (defvar mpg123-process-coding-system
-  (cond ((and (fboundp 'modify-coding-system-alist)
-	      (intern-soft "euc-jp")
-	      (featurep 'mule))
-	 'euc-jp)
-	((boundp '*euc-japan*) *euc-japan*)
-	(t nil))
+  nil
   "*Default process coding system for mpg123.
 mpg123コマンド用の漢字コード。漢字ファイル名があるときは必須")
 (defvar mpg123-format-name-function nil
@@ -799,21 +802,32 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*time-setting-mode nil)
 (defvar mpg123*repeat-count-marker nil)
 (defvar mpg123*loop-count-marker nil)
-;(defvar mpg123-playlist-regexp ".*\\.m3u"
-;  "*Regular expression to match to playlist files")
+					;(defvar mpg123-playlist-regexp ".*\\.m3u"
+					;  "*Regular expression to match to playlist files")
 (defvar mpg123-url-regexp "https?://.*"
   "*Regular expression to match to URL requests")
 
 (defvar mpg123-mpg123-time-regexp  "Time: \\(..:..\\)... +\\[\\(..:..\\)")
 (defvar mpg123-mpg123-init-frame-regexp "Frame# *[0-9]+ *\\[\\([ 0-9]+\\]\\)")
 (defvar mpg123-mpg123-frame-regexp "Frame# *\\([0-9]+\\) *")
+(defvar mpg123-mpg123-start-frame-opt "-vk")
 
 (defvar mpg123-ogg123-time-regexp "Time: \\(..:..\\)... +\\[..:.....\\] of \\([0-9][0-9]:[0-9][0-9]\\)")
 (defvar mpg123-ogg123-frame-regexp "Time: \\(..:..\\)... +\\[..:.....\\]")
 (defvar mpg123-ogg123-init-frame-regexp " of \\(..:..\\)...")
+(defvar mpg123-ogg123-start-frame-opt "-vk")
+
+(defvar mpg123-mplayer-time-regexp "^A:  *\\([0-9.]+\\)...* +(\\([0-9:]+\\).*) ")
+(defvar mpg123-mplayer-frame-regexp "A:  *[0-9.]+ +(\\([:0-9.]+\\))")
+(defvar mpg123-mplayer-init-frame-regexp " of [0-9.]+ (\\([:0-9.]+\\).*)...")
+(defvar mpg123-mplayer-start-frame-opt "-ss")
+(defvar mpg123-mplayer-volume-set-regexp "Volume:  *\\([0-9]+\\) *%")
+(defvar mpg123*mplayerp nil)
+
 (defvar mpg123:time-regexp nil)
 (defvar mpg123:frame-regexp nil)
 (defvar mpg123:init-frame-regexp nil)
+(defvar mpg123:volume-set-regexp nil)
 (defvar mpg123*convert-frame-function nil)
 (defvar mpg123*cur-total-frame nil)
 (defvar mpg123*indicator-overlay nil)
@@ -830,6 +844,9 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 
 (defvar mpg123-type-alist
   '(("mp3" . "mpg123") ("ogg" . "ogg123")))
+
+(defvar mpg123-command-alist
+  '(("mp3" . "mplayer") ("ogg" . "mplayer")))
 
 (fset 'mpg123:buffer-substring
       (if (fboundp 'buffer-substring-no-properties)
@@ -885,6 +902,43 @@ whether mpg123 functions can be called."
 (defun mpg123:get-sound-type (name)
   (cdr (assoc (downcase (mpg123:file-name-extension name)) mpg123-type-alist)))
 
+(defun mpg123:get-command-type (name)
+  (cdr (assoc (downcase (mpg123:file-name-extension name)) mpg123-command-alist)))
+
+(defun mpg123:get-from-command-about (file what)
+  (let* ((case-fold-search t)
+	 (type (mpg123:get-command-type file))
+	 (var (format "mpg123-%s-%s" type what)))
+    (and type
+	 (intern-soft var)
+	 (symbol-value (intern var)))))
+
+(defun mpg123:get-command-name (file)
+  (mpg123:get-from-command-about file "command"))
+
+(defun mpg123:get-command-args (file)
+  (mpg123:get-from-command-about file "command-args"))
+
+(defun mpg123:time-regexp (file)
+  "Return time-regexp corresponding to FILE"
+  (or (mpg123:get-from-command-about file "time-regexp")
+      "CANTBEHERE"))
+
+(defun mpg123:volume-set-regexp (file)
+  "Return volume set corresponding to FILE"
+  (or (mpg123:get-from-command-about file "volume-set-regexp")
+      "NOT APPLICABLE"))
+
+(defun mpg123:init-frame-regexp (file)
+  (or (mpg123:get-from-command-about file "init-frame-regexp")
+      "CANTBEHERE"))
+(defun mpg123:frame-regexp (file)
+  (or (mpg123:get-from-command-about file "frame-regexp")
+      "CANTBEHERE"))
+(defun mpg123:start-frame-opt (file)
+  (or (mpg123:get-from-command-about file "start-frame-opt")
+      "CANTBEHERE"))
+
 (defun mpg123:get-from-file-about (file what)
   (let* ((case-fold-search t)
 	 (type (mpg123:get-sound-type file))
@@ -893,26 +947,8 @@ whether mpg123 functions can be called."
 	 (intern-soft var)
 	 (symbol-value (intern var)))))
 
-(defun mpg123:get-command-name (file)
-  (mpg123:get-from-file-about file "command"))
-
-(defun mpg123:get-command-args (file)
-  (mpg123:get-from-file-about file "command-args"))
-
-(defun mpg123:time-regexp (file)
-  "Return time-regexp corresponding to FILE"
-  (or (mpg123:get-from-file-about file "time-regexp")
-      "CANTBEHERE"))
-
-(defun mpg123:init-frame-regexp (file)
-  (or (mpg123:get-from-file-about file "init-frame-regexp")
-      "CANTBEHERE"))
-(defun mpg123:frame-regexp (file)
-  (or (mpg123:get-from-file-about file "frame-regexp")
-      "CANTBEHERE"))
-
 (defun mpg123:convert-frame-function (filename)
-  (let*((type (mpg123:get-sound-type filename))
+  (let*((type (mpg123:get-command-type filename))
 	(fname (format "mpg123-%s-convert-frame" type)))
     (if (and (intern-soft fname)
 	     (fboundp (intern fname)))
@@ -925,6 +961,21 @@ whether mpg123 functions can be called."
 (defun mpg123-ogg123-convert-frame (time filename)
   "Return (mpg123:time2frame TIME FILENAME)"
   (mpg123:str2int (mpg123:time2frame time filename)))
+(defun mpg123-mplayer-convert-frame (time filename)
+					;(message "time=%s" time)
+  (if (> (length time) 4)	; "44.0" for files less that 1minute
+      (mpg123-ogg123-convert-frame time filename)
+    (mpg123:str2int time)))
+
+(defun mpg123:mmss (timestr)
+  (let ((md (match-data)))
+    (unwind-protect
+	(if (string-match ":" timestr) timestr
+	  (let ((sec (mpg123:str2int timestr)))
+	    (format "%02d:%02d" (/ sec 60) (% sec 60))))
+      (store-match-data md))))
+(defun mpg123:convert-frame (frame file)
+  (funcall mpg123*convert-frame-function frame file))
 
 ;;;
 ;; Functions related to sound file format inspection
@@ -977,7 +1028,7 @@ Optional third argument LITTLE-ENDIAN is self extplanatory."
 	   'binary))			;XEmacs(maybe)
 	(file-coding-system-for-read '*noconv*)) ;19
     (apply 'insert-file-contents args)))
-  
+
 (defun mpg123:mp3-p (f &optional pattern)
   "Check the file F is MPEG 1 Audio file or not.
 If optional argument PATTERN given, search it(tentative)."
@@ -1001,7 +1052,7 @@ If optional argument PATTERN given, search it(tentative)."
 		(catch 'found
 		  (if (stringp pattern)
 		      (throw 'found
-			(re-search-forward pattern nil t)))
+			     (re-search-forward pattern nil t)))
 		  (if (string-match "^19\\." emacs-version)
 		      (while (search-forward "\xff" nil t) ;Scan `0xff'
 			(setq e0 (match-end 0) b0 (match-beginning 0))
@@ -1049,13 +1100,13 @@ If optional argument PATTERN given, search it(tentative)."
   (goto-char mpg123*cur-play-marker)
   (skip-chars-forward "^:")
   (skip-chars-backward "^ "))
-; (defmacro mpg123:goto-playtime-position ()
-;   (list 'progn
-; 	(list 'goto-char 'mpg123*cur-play-marker)
-; 	;(list 'move-to-column 3)
-; 	(list 'skip-chars-forward "^:")
-; 	(list 'forward-char -2)
-; 	))
+					; (defmacro mpg123:goto-playtime-position ()
+					;   (list 'progn
+					; 	(list 'goto-char 'mpg123*cur-play-marker)
+					; 	;(list 'move-to-column 3)
+					; 	(list 'skip-chars-forward "^:")
+					; 	(list 'forward-char -2)
+					; 	))
 
 (defsubst mpg123:update-playtime (timestr &optional here)
   "Update playing time string"
@@ -1067,16 +1118,16 @@ If optional argument PATTERN given, search it(tentative)."
       (while (/= (char-after (point)) ?/) (delete-char 1))
       (insert timestr))))
 
-; (defmacro mpg123:update-playtime (timestr)
-;   (list 'save-excursion
-; 	(list 'set-buffer (list 'marker-buffer 'mpg123*cur-play-marker))
-; 	;(list 'set-buffer 'mpg123*buffer)
-; 	(list 'let (list 'buffer-read-only)
-; 	      (list 'mpg123:goto-playtime-position)
-; 	      (list 'delete-char 5)
-; 	      (list 'insert timestr)
-; 	      ;(list 'set-buffer-modified-p nil) ;is not essential
-; 	      )))
+					; (defmacro mpg123:update-playtime (timestr)
+					;   (list 'save-excursion
+					; 	(list 'set-buffer (list 'marker-buffer 'mpg123*cur-play-marker))
+					; 	;(list 'set-buffer 'mpg123*buffer)
+					; 	(list 'let (list 'buffer-read-only)
+					; 	      (list 'mpg123:goto-playtime-position)
+					; 	      (list 'delete-char 5)
+					; 	      (list 'insert timestr)
+					; 	      ;(list 'set-buffer-modified-p nil) ;is not essential
+					; 	      )))
 
 (defun mpg123:update-length (timestr)
   "Update music length time string"
@@ -1155,8 +1206,8 @@ If optional argument PATTERN given, search it(tentative)."
 
 (defun mpg123:get-music-info (n attr)
   (cdr (assq attr (assoc n mpg123*music-alist))))
-; (defmacro mpg123:get-music-info (n attr)
-;   (list 'cdr (list 'assq attr (list 'assoc n 'mpg123*music-alist))))
+					; (defmacro mpg123:get-music-info (n attr)
+					;   (list 'cdr (list 'assq attr (list 'assoc n 'mpg123*music-alist))))
 
 (defun mpg123:delete-music-from-list (n)
   "Delete music number N from mpg123*music-alist."
@@ -1207,14 +1258,14 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	  (mpg123:open-error)
 	  (error "bye")))
     (if (string-match mpg123:init-frame-regexp mess)
-	(let ((f (substring mess (match-beginning 1) (match-end 1))))
+	(let ((f (mpg123:match-string 1 1 mess)))
 	  (mpg123:set-music-info
 	   mpg123*cur-music-number 'frames
 	   (setq mpg123*cur-total-frame
-		 (funcall mpg123*convert-frame-function f targetfile)))))
+		 (mpg123:convert-frame f targetfile)))))
     (if (string-match mpg123:time-regexp mess)
-	(let ((cur (substring mess (match-beginning 1) (match-end 1)))
-	      (max (substring mess (match-beginning 2) (match-end 2))))
+	(let ((cur (mpg123:mmss (mpg123:match-string 1 1 mess)))
+	      (max (mpg123:mmss (mpg123:match-string 2 2 mess))))
 	  (mpg123:update-playtime cur)
 	  (mpg123:set-music-info
 	   mpg123*cur-music-number 'length max)
@@ -1222,7 +1273,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	      (mpg123:update-length max))
 	  ))
 					;  (save-excursion
-				    ;    (set-buffer mpg123*info-buffer)
+					;    (set-buffer mpg123*info-buffer)
 					;    (insert mess))
     (and (mpg123:get-music-info mpg123*cur-music-number 'length)
 	 (mpg123:get-music-info mpg123*cur-music-number 'frames)
@@ -1255,7 +1306,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(let ((update-slider (not mpg123-lazy-slider)))
 	  (setq mess (mpg123:adjust-output mess))
 	  (if (string-match mpg123:time-regexp mess)
-	      (let ((s (substring mess (match-beginning 1) (match-end 1))) mp)
+	      (let ((s (mpg123:mmss (mpg123:match-string 1 1 mess))) mp)
 		(and (not (string= s mpg123*cur-playtime))
 		     (not mpg123*time-setting-mode)
 		     (setq update-slider t) ;beware! always returns t
@@ -1269,20 +1320,21 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 			      (set-buffer mpg123*buffer)
 			      (mpg123:kill-current-music)))))))
 	  (if (string-match mpg123:frame-regexp mess)
-	      (let (c)
+	      (let ((s (mpg123:mmss (mpg123:match-string 1 1 mess))))
 		(setq mpg123*cur-playframe
-		      (funcall mpg123*convert-frame-function
-			       (substring mess
-					  (match-beginning 1)
-					  (match-end 1))
-			       mpg123*cur-music-file))
+		      (mpg123:convert-frame s mpg123*cur-music-file))
 		(if (or update-slider
 			(= mpg123*cur-playframe mpg123*cur-total-frame))
 		    (progn	    ;redraw & slider only if it's needed
 		      (and mpg123-auto-redraw
 			   (/= (mpg123:window-width) mpg123*window-width)
 			   (mpg123:draw-slider-help nil))
-		      (mpg123:slider-check)))))))))
+		      (mpg123:slider-check)))))
+	  (if (string-match mpg123:volume-set-regexp mess)
+	      (let ((v (mpg123:str2int (mpg123:match-string 1 1 mess))))
+		;; When set by mplayer, cur-volume value obeys it.
+		(setq mpg123*cur-volume (cons v v))
+		(mpg123:update-volume mpg123*cur-volume)))))))
 
 (defsubst mpg123:slider-check-1 ()
   (let ((c (/ (* (mpg123:window-width)
@@ -1365,7 +1417,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
     (setq mpg123*interrupt-p nil))))
 
 (defvar mpg123*time2frame-ratio-alist
-  '(("mpg123" 1000 . 26) ("ogg123" 1 . 1)))
+  '(("mpg123" 1000 . 26) ("ogg123" 1 . 1) ("mplayer" 1 . 1)))
 
 (defun mpg123:time2frame (timestr &optional filename)
   "Convert time string (mm:ss) to frame number.(0.026s/f)"
@@ -1378,7 +1430,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	(total (+ (* m 60) s))
 	(frames (mpg123:get-music-info mpg123*cur-music-number 'frames))
 	(length (mpg123:get-music-info mpg123*cur-music-number 'length))
-	(type (mpg123:get-sound-type filename))
+	(type (mpg123:get-command-type filename))
 	(alist mpg123*time2frame-ratio-alist)
 	(ratio-f (car (cdr (assoc type alist))))
 	(ratio-s (cdr (cdr (assoc type alist)))))
@@ -1485,7 +1537,7 @@ if slider is already visible.
       nil ;;if not on music line, then exit
     (let ((continue (equal mpg123*cur-music-number (mpg123:get-music-number)))
 	  (file-name-coding-system mpg123-file-name-coding-system)
-	  music p)
+	  music p cmd vol)
       (setq mpg123*cur-music-number (mpg123:get-music-number)
 	    mpg123*cur-total-frame (mpg123:get-music-info
 				    mpg123*cur-music-number 'frames))
@@ -1546,17 +1598,25 @@ if slider is already visible.
       (setq mpg123:time-regexp (mpg123:time-regexp music)
 	    mpg123:init-frame-regexp (mpg123:init-frame-regexp music)
 	    mpg123:frame-regexp (mpg123:frame-regexp music)
+	    mpg123:volume-set-regexp (mpg123:volume-set-regexp music)
 	    mpg123*convert-frame-function (mpg123:convert-frame-function
 					   music))
+      (setq cmd (mpg123:get-command-name music) ;; Set to local vars
+	    vol (if (consp mpg123*cur-volume) (car mpg123*cur-volume)
+		  mpg123-startup-volume mpg123-startup-volume))
       (set-process-filter
        (setq p (apply 'start-process "mpg123"
 		      (current-buffer)
-		      (mpg123:get-command-name music)
+		      cmd
 		      (delq nil
 			    (append
 			     (list
-			      "-v" "-k" mpg123*cur-start-frame)
+			      (mpg123:start-frame-opt music)
+			      mpg123*cur-start-frame)
 			     (mpg123:get-command-args music)
+			     (and (setq mpg123*mplayerp
+					(string-match "mplayer" cmd))
+				  (list "-volume" (format "%d" vol)))
 			     (list music)))))
        (if (and (mpg123:get-music-info mpg123*cur-music-number 'length)
 		(mpg123:get-music-info mpg123*cur-music-number 'frames))
@@ -1905,7 +1965,7 @@ percentage in the length of the song etc.
   (and
    (file-exists-p file)
    (not (file-directory-p file))
-   ;(not (mpg123:sound-p file))
+					;(not (mpg123:sound-p file))
    (save-excursion
      (let ((b (set-buffer (get-buffer-create " *mpg123pl*")))
 	   (PATH_MAX 1024)
@@ -1963,7 +2023,7 @@ percentage in the length of the song etc.
 (defun mpg123-loop-dummy ()
   "Dummy function to cause mpg123-set-point-for-next-song-function to loop"
   (if (not (= mpg123*cur-loop-count -1))
-    (mpg123-decrease-loop-count 1))
+      (mpg123-decrease-loop-count 1))
   t)
 
 
@@ -2008,11 +2068,11 @@ percentage in the length of the song etc.
    ((get-buffer-window buffer)
     (select-window (get-buffer-window buffer)))
    ((one-window-p)
-      (let ((h (max window-min-height
-		    (- (window-height) mpg123-popup-window-height))))
-	(split-window nil h)
-	(other-window 1)
-	(switch-to-buffer buffer)))
+    (let ((h (max window-min-height
+		  (- (window-height) mpg123-popup-window-height))))
+      (split-window nil h)
+      (other-window 1)
+      (switch-to-buffer buffer)))
    (t
     (other-window 1)
     (switch-to-buffer buffer))))
@@ -2136,7 +2196,7 @@ percentage in the length of the song etc.
 	(mpgw (if (eq (window-buffer selw) mpg123*buffer)
 		  selw
 		(mpg123:get-largest-buffer-window mpg123*buffer nil t)))
-	;(mpgf (window-frame mpgw))
+					;(mpgf (window-frame mpgw))
 	mpgwinlist nowvisible needed-lines numlines (numwin 1)
 	w redrawp (i 300))
     (unwind-protect
@@ -2145,7 +2205,7 @@ percentage in the length of the song etc.
 		(null mpg123-need-slider)
 		(null mpg123*cur-play-marker))
 	    nil				;no need to show, maybe
-	  ;(select-frame mpgf)
+					;(select-frame mpgf)
 	  (select-window mpgw)
 	  (setq redrawp (not (pos-visible-in-window-p mpg123*cur-play-marker)))
 	  (goto-char mpg123*cur-play-marker)
@@ -2261,7 +2321,7 @@ optional argument METHOD.  Set one of ?o or ?i or ?r."
 When called from function, optional argument COMMAND directly select the job."
   (interactive)
   (if (not (mpg123:in-music-list-p))
-    (error "Not on music list"))
+      (error "Not on music list"))
   (let*((n (mpg123:get-music-number)) p c
 	(file (mpg123:get-music-info n 'filename)))
     (if command
@@ -2296,7 +2356,7 @@ When called from function, optional argument COMMAND directly select the job."
   (interactive)
   (let ((p (get-buffer-process (current-buffer)))
 	(buffers (list mpg123*buffer mpg123*info-buffer mpg123*stack-buffer
-		  " *mpg123tmp* " " *mpg123 tag tmp*" " *mpg123 mixer* ")))
+		       " *mpg123tmp* " " *mpg123 tag tmp*" " *mpg123 mixer* ")))
     (if (and p
 	     (eq (process-status p) 'run)
 	     (or yes (y-or-n-p "Kill current music?")))
@@ -2353,7 +2413,7 @@ When called from function, optional argument COMMAND directly select the job."
 		   (goto-char m0)
 		   (skip-chars-backward " \t")
 		   (point))))
-		   
+	
         (and f ;;(looking-at "^[ \t]*\\(.*[^ \t\n\r]\\)[ \t\n\r]*$")
              (setq f (expand-file-name f dir))
              (message "Inspect file %s..." f)
@@ -2390,9 +2450,9 @@ When called from function, optional argument COMMAND directly select the job."
       (while (search-forward "　" nil t) (replace-match " ")))
     (save-excursion
       (while (re-search-forward "\\s \\s +" nil t)
-      (replace-match " ")))
+	(replace-match " ")))
     (if (re-search-forward "\\s +$" nil t)
-      (replace-match ""))))
+	(replace-match ""))))
 
 (defun mpg123:peek-id3-tag (file)
   "Try peeking id3tag from FILE"
@@ -2482,16 +2542,22 @@ Optional 4th arg OFFSET is added to BEGIN and END."
 
 (defun mpg123:ogg123-tag-by-ogginfo (file)
   "Get FILE's title and artist by calling ogginfo."
-  (let*((eucjp (if (coding-system-p '*euc-japan*) '*euc-japan* 'euc-jp))
-	(file-name-coding-system mpg123-file-name-coding-system)
-	(process-coding-system-alist
-	 (list (cons mpg123-program-ogginfo (cons eucjp eucjp))))
+  (let*((file-name-coding-system mpg123-file-name-coding-system)
 	(buf (get-buffer-create " *mpg123tmp"))
-	(title "") (artist "")
+	(title "") (artist "") (md (match-data))
+	(dcode (car (detect-coding-string file)))
+	(coding (symbol-name dcode))
+	(process-coding-system-alist
+	 (list (cons mpg123-program-ogginfo (cons dcode dcode))))
 	(oldenv (getenv "LC_CTYPE")))
     (unwind-protect
 	(progn
-	  (setenv "LC_CTYPE" "ja_JP.eucJP")
+	  (setenv "LC_CTYPE" (cond
+			      ((string-match "japa.*8bit" coding)
+			       "ja_JP.eucJP")
+			      ((string-match "shift\\|cp952" coding)
+			       "ja_JP.Shift_JIS")
+			      (t oldenv)))
 	  (call-process mpg123-program-ogginfo nil buf nil file)
 	  (save-excursion
 	    (set-buffer buf)
@@ -2500,7 +2566,7 @@ Optional 4th arg OFFSET is added to BEGIN and END."
 		    "^\\s *\\(\\(artist\\)\\|title\\)=\\(.*\\)$" nil 1)
 					; 1 is essential
 	      (set (if (match-beginning 2) 'artist 'title)
-		   (mpg123:match-string 3)))
+	           (mpg123:match-string 3)))
 	    ;; Get Music Length here :)
 	    (if (re-search-backward
 		 "length: \\([0-9]+\\)m.\\([.0-9]+\\)s"
@@ -2518,6 +2584,7 @@ Optional 4th arg OFFSET is added to BEGIN and END."
 		    (if (string< "" title) title (file-name-nondirectory file))
 		    artist)))
       (setenv "LC_CTYPE" oldenv)
+      (store-match-data md)
       (kill-buffer buf))))
 
 (defun mpg123:ogg123-get-tag (file)
@@ -2641,7 +2708,7 @@ mpg123:
 \\[mpg123-mark-position]	" (m "Mark position (when playing)"
 				     "現在の再生位置をマーク(再生中のみ)") "
 \\[mpg123-refrain]	" (m "Restart from marked position"
-			     "マークした位置に戻って再生") "
+				     "マークした位置に戻って再生") "
 \\[mpg123-where-is-mark]	" (m "Where is the marked position"
 				     "マークした位置の確認") "
 \\[mpg123-<]	<<
@@ -2656,41 +2723,41 @@ mpg123:
 \\[mpg123-volume-decrease]	" (m "Volume down" "音量減少") "
 \\[mpg123-volume-increase]	" (m "Volume up" "音量増加") "
 \\[mpg123-open-new]	" (m "Open other directory or playlist file"
-			     "別のディレクトリ(またはプレイリスト)を開く") "
+				     "別のディレクトリ(またはプレイリスト)を開く") "
 \\[mpg123-add-new]	" (m "Add other directory or playlist file"
-			     "別のディレクトリ(またはプレイリスト)を追加") "
+				     "別のディレクトリ(またはプレイリスト)を追加") "
 \\[mpg123-save-playlist]	" (m "Save current playlist to a file"
 				     "現在のリストをファイルに保存") "
 \\[mpg123-increase-repeat-count]	" (m "Increase repetition count"
-					     "繰り返し数を増加") "
+				     "繰り返し数を増加") "
 \\[mpg123-decrease-repeat-count]\t" (m "Decrease repetition count (-1 for infinity)"
-				       "繰り返し数を減少(-1で無限回)") "
+				     "繰り返し数を減少(-1で無限回)") "
 \\[mpg123-increase-loop-count]	" (m "Increase current loop count"
-					     "今の曲の繰り返し数増加") "
+				     "今の曲の繰り返し数増加") "
 \\[mpg123-decrease-loop-count]\t" (m "Decrease current loop count. Also toggles between 0(no loop) and -1(always loop)"
-				       "今の曲の繰り返し数減少(-1で無限回)") "
+				     "今の曲の繰り返し数減少(-1で無限回)") "
 \\[mpg123-shuffle]	" (m "Shuffle music list" "再生リストのシャッフル") "
 \\[mpg123-delete-file]	" (m "Delete music file" "曲ファイルの削除") "
 \\[mpg123-display-slider]	" (m "Display playing position indicator" "演奏位置表示スライダーを見せる") "
 \\[mpg123-kill-line]	" (m "Kill music line and push onto stack"
-			     "現在行をスタックへ移動(kill)") "
+				     "現在行をスタックへ移動(kill)") "
 \\[mpg123-yank-line]	" (m "Yank music line from stack"
-			     "スタックの一番上から曲を戻す(yank)") "
+				     "スタックの一番上から曲を戻す(yank)") "
 \\[mpg123-introduction-quiz-mode]	"
-     (m "Intro-quiz mode ON/OFF (Stop at marked position)"
-	"イントロクイズモード ON/OFF (マークした位置で必ず止まる)") "
+				     (m "Intro-quiz mode ON/OFF (Stop at marked position)"
+					"イントロクイズモード ON/OFF (マークした位置で必ず止まる)") "
 \\[mpg123-quit]	" (m "Quit" "終了") "
 \\[mpg123-quit-yes]	" (m "Quit without query" "終了(確認なし)") "
 \\[mpg123-mouse-force-play]	" (m "Select a music directly on the mouse cursor"
-				     "マウスポインタの位置の曲を再生") "
+					"マウスポインタの位置の曲を再生") "
 0..9	" (m "Digit argument (ex. 50V increase volume by 50steps)"
-	     "数引数 (50V とやると50段階音量増加)") "
+					"数引数 (50V とやると50段階音量増加)") "
 ----
 " (m "The delimiter line \"-------\" is the indicator of currently playing position.
 You may see the slider on the line running from left to right while the
 music's going ahead.  If you hit \\[mpg123-play] or \\[mpg123-mouse-force-play] on the indicator line,
 the music will immediately move to that position."
-     "曲一覧の下にある \"-------\" の行は現在の曲の再生位置を相対的に示して
+					"曲一覧の下にある \"-------\" の行は現在の曲の再生位置を相対的に示して
 移動する。この行の好きな位置にポイントを合わせて \\[mpg123-play] または
 \\[mpg123-mouse-force-play] を押すとその曲のうち指定した位置にジャンプする。
 あ、このヘルプが英語の方がかちょええ場合は (setq mpg123-lang 0) すべし。
@@ -2742,7 +2809,7 @@ the music will immediately move to that position."
 
 (defun mpg123:add-musiclist-to-point (files i)
   "Add music FILES to point and music-info-alist"
-  (let ((file-name-coding-system mpg123-file-name-coding-system)
+  (let ((default-file-name-coding-system mpg123-file-name-coding-system)
 	f sf (i (1+ (mpg123:max-music-number))) name)
     (while files
       (setq f (car files))
@@ -2878,86 +2945,102 @@ the music will immediately move to that position."
 ;;;
 (defun mpg123:get-volume ()
   "Get current volume"
-  (if mpg123-mixer-command
-      (cond
-       ((eq mpg123-mixer-type 'mixer)
-	(let ((b (get-buffer-create " *mpg123 mixer* "))
-	      vol)
-	  (set-buffer b)
-	  (erase-buffer)
-	  (call-process mpg123-mixer-command nil b nil "vol")
-	  (goto-char (point-min))
-	  (if (re-search-forward "set to *\\([0-9]+\\):\\([0-9]+\\)" nil t)
-	      (let ((left (mpg123:match-string 1))
-		    (right (mpg123:match-string 2)))
-		(setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
-	    (setq vol "unknown"))
-	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-mixer-type 'mixerctl)
-	(let ((b (get-buffer-create " *mpg123 mixer* "))
-	      vol)
-	  (set-buffer b)
-	  (erase-buffer)
-	  (call-process mpg123-mixer-command
-			nil b nil "-v" (car mpg123-mixer-setvol-target-list))
-	  (goto-char (point-min))
-	  (if (re-search-forward "=*\\([0-9]+\\),\\([0-9]+\\)" nil t)
-	      (let ((left (mpg123:match-string 1))
-		    (right (mpg123:match-string 2)))
-		(setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
-	    (setq vol "unknown"))
-	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-mixer-type 'aumix)
-	(let ((b (get-buffer-create " *mpg123 mixer* "))
-	      vol)
-	  (set-buffer b)
-	  (erase-buffer)
-	  (call-process mpg123-mixer-command nil b nil "-w" "q")
-	  (goto-char (point-min))
-	  (if (re-search-forward "pcm *\\([0-9]+\\), *\\([0-9]+\\)" nil t)
-	      (let ((left (mpg123:match-string 1))
-		    (right (mpg123:match-string 2)))
-		(setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
-	    (setq vol "unknown"))
-	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-mixer-type 'alsa)
-	(let ((b (get-buffer-create " *mpg123 mixer* "))
-	      vol)
-	  (set-buffer b)
-	  (erase-buffer)
-	  (call-process mpg123-mixer-command nil b nil "sget" "PCM")
-	  (goto-char (point-min))
-          (if (re-search-forward "Left: Playback \\([0-9]+\\).*\n.*Right: Playback \\([0-9]+\\)" nil t)
-	      (let ((left (mpg123:match-string 1))
-		    (right (mpg123:match-string 2)))
-		(setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
-	    (setq vol "unknown"))
-	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-mixer-type 'mixer.exe)
-	(let ((b (get-buffer-create " *mpg123 mixer* "))
-	      vol)
-	  (set-buffer b)
-	  (erase-buffer)
-	  (call-process mpg123-mixer-command nil b nil)
-	  (goto-char (point-min))
-	  (if (re-search-forward "\\([0-9]+\\):\\([0-9]+\\)" nil t)
-	      (let ((left (mpg123:match-string 1))
-		    (right (mpg123:match-string 2)))
-		(setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
-	    (setq vol "unknown"))
-	  (setq mpg123*cur-volume vol)))
-       ((eq mpg123-mixer-type 'audioctl)
-	"unknown")
-       (t 
-        "unknown"))))
+  (cond
+   (mpg123-mixer-command
+    (cond
+     ((eq mpg123-mixer-type 'mixer)
+      (let ((b (get-buffer-create " *mpg123 mixer* "))
+	    vol)
+	(set-buffer b)
+	(erase-buffer)
+	(call-process mpg123-mixer-command nil b nil "vol")
+	(goto-char (point-min))
+	(if (re-search-forward "set to *\\([0-9]+\\):\\([0-9]+\\)" nil t)
+	    (let ((left (mpg123:match-string 1))
+		  (right (mpg123:match-string 2)))
+	      (setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
+	  (setq vol "unknown"))
+	(setq mpg123*cur-volume vol)))
+     ((eq mpg123-mixer-type 'mixerctl)
+      (let ((b (get-buffer-create " *mpg123 mixer* "))
+	    vol)
+	(set-buffer b)
+	(erase-buffer)
+	(call-process mpg123-mixer-command
+		      nil b nil "-v" (car mpg123-mixer-setvol-target-list))
+	(goto-char (point-min))
+	(if (re-search-forward "=*\\([0-9]+\\),\\([0-9]+\\)" nil t)
+	    (let ((left (mpg123:match-string 1))
+		  (right (mpg123:match-string 2)))
+	      (setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
+	  (setq vol "unknown"))
+	(setq mpg123*cur-volume vol)))
+     ((eq mpg123-mixer-type 'aumix)
+      (let ((b (get-buffer-create " *mpg123 mixer* "))
+	    vol)
+	(set-buffer b)
+	(erase-buffer)
+	(call-process mpg123-mixer-command nil b nil "-w" "q")
+	(goto-char (point-min))
+	(if (re-search-forward "pcm *\\([0-9]+\\), *\\([0-9]+\\)" nil t)
+	    (let ((left (mpg123:match-string 1))
+		  (right (mpg123:match-string 2)))
+	      (setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
+	  (setq vol "unknown"))
+	(setq mpg123*cur-volume vol)))
+     ((eq mpg123-mixer-type 'alsa)
+      (let ((b (get-buffer-create " *mpg123 mixer* "))
+	    vol)
+	(set-buffer b)
+	(erase-buffer)
+	(call-process mpg123-mixer-command nil b nil "sget" "PCM")
+	(goto-char (point-min))
+        (if (re-search-forward "Left: Playback \\([0-9]+\\).*\n.*Right: Playback \\([0-9]+\\)" nil t)
+	    (let ((left (mpg123:match-string 1))
+		  (right (mpg123:match-string 2)))
+	      (setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
+	  (setq vol "unknown"))
+	(setq mpg123*cur-volume vol)))
+     ((eq mpg123-mixer-type 'mixer.exe)
+      (let ((b (get-buffer-create " *mpg123 mixer* "))
+	    vol)
+	(set-buffer b)
+	(erase-buffer)
+	(call-process mpg123-mixer-command nil b nil)
+	(goto-char (point-min))
+	(if (re-search-forward "\\([0-9]+\\):\\([0-9]+\\)" nil t)
+	    (let ((left (mpg123:match-string 1))
+		  (right (mpg123:match-string 2)))
+	      (setq vol (cons (mpg123:str2int left) (mpg123:str2int right))))
+	  (setq vol "unknown"))
+	(setq mpg123*cur-volume vol)))
+     ((eq mpg123-mixer-type 'audioctl)
+      "unknown")
+     (t 
+      "unknown")))
+   ;; if mixer-type is mplayer, set volumes after process invocation
+   ((eq mpg123-mixer-type 'mplayer)
+    (setq vol (if (consp mpg123*cur-volume)
+		  mpg123*cur-volume
+		(cons mpg123-startup-volume mpg123-startup-volume))))))
 
 (defun mpg123:set-volume (vollist)
   "Set volume"
   (if (integerp vollist) (setq vollist (cons vollist vollist)))
-  (if (and mpg123-mixer-command
-	   (memq mpg123-mixer-type
-		 '(mixer mixerctl aumix audioctl nt alsa)))
-      (let*((l mpg123-mixer-setvol-target-list)
+  (cond ((and mpg123*cur-music-file
+	      (string-match
+	       "mplayer" (mpg123:get-command-name mpg123*cur-music-file))
+	      (let ((p (get-buffer-process mpg123*buffer)))
+		(and (processp p)
+		     (process-live-p p)
+		     (process-send-string
+		      p 
+		      (if (eq this-command 'mpg123-volume-increase) "0" "9"))))))
+	;;
+	((and mpg123-mixer-command
+	      (memq mpg123-mixer-type
+		    '(mixer mixerctl aumix audioctl nt alsa)))
+	 (let*((l mpg123-mixer-setvol-target-list)
 	    (ctl-type (eq mpg123-mixer-type 'mixerctl))
 	    (v (format "%d%c%d"
 		       (car vollist) (if (memq mpg123-mixer-type '(mixerctl alsa)) ?, ?:) (cdr vollist)))
@@ -2975,7 +3058,7 @@ the music will immediately move to that position."
         ;(message (format "args: %S" args))
 	(apply 'call-process
 	       mpg123-mixer-command nil nil nil
-	       args))))
+	       args)))))
 
 (defun mpg123-volume-increase (arg)
   "Increase both(left/right) volume by ARG count."
@@ -2988,6 +3071,9 @@ the music will immediately move to that position."
       (mpg123:set-volume (cons left right))))
    ((integerp mpg123*cur-volume)
     (let ((v (max 0 (min (+ mpg123*cur-volume arg)))))
+      (mpg123:set-volume (cons v v))))
+   (mpg123*mplayerp
+    (let ((v (or mpg123*cur-volume mpg123-startup-volume)))
       (mpg123:set-volume (cons v v)))))
   (mpg123:update-volume mpg123*cur-volume))
 
