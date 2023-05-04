@@ -1,8 +1,8 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
 ;;; (c)1999-2023 by HIROSE Yuuji [yuuji>at<gentei.org]
 ;;; $Id: mpg123.el,v 1.63 2023/05/03 05:54:13 yuuji Exp yuuji $
-;;; Last modified Thu May  4 21:01:04 2023 on firestorm
-;;; Update count: 1513
+;;; Last modified Thu May  4 23:18:17 2023 on firestorm
+;;; Update count: 1524
 
 ;;; Commentary:
 ;;	
@@ -2367,7 +2367,8 @@ When called from function, optional argument COMMAND directly select the job."
 	  (switch-to-buffer mpg123*initial-buffer)))
     (setq mpg123*interrupt-p 'quit)
     (message "")
-    (mapcar '(lambda (b) (and (get-buffer b) (kill-buffer b))) buffers)))
+    (mapcar
+     (function (lambda (b) (and (get-buffer b) (kill-buffer b)))) buffers)))
 
 (defun mpg123-quit-yes ()
   "Force to quit"
@@ -3020,9 +3021,9 @@ the music will immediately move to that position."
       "unknown")))
    ;; if mixer-type is mplayer, set volumes after process invocation
    ((eq mpg123-mixer-type 'mplayer)
-    (setq vol (if (consp mpg123*cur-volume)
-		  mpg123*cur-volume
-		(cons mpg123-startup-volume mpg123-startup-volume))))))
+    (or (consp mpg123*cur-volume)
+	(setq mpg123*cur-volume
+	      (cons mpg123-startup-volume mpg123-startup-volume))))))
 
 (defun mpg123:set-volume (vollist)
   "Set volume"
@@ -3032,10 +3033,11 @@ the music will immediately move to that position."
 	       "mplayer" (mpg123:get-command-name mpg123*cur-music-file))
 	      (let ((p (get-buffer-process mpg123*buffer)))
 		(and (processp p)
-		     (process-live-p p)
+		     (eq (process-status p) 'run)
 		     (process-send-string
 		      p 
-		      (if (eq this-command 'mpg123-volume-increase) "0" "9"))))))
+		      (if (eq this-command 'mpg123-volume-increase)
+			  "0" "9"))))))
 	;;
 	((and mpg123-mixer-command
 	      (memq mpg123-mixer-type
@@ -3188,8 +3190,9 @@ the music will immediately move to that position."
 (if (and mpg123-process-coding-system (symbolp mpg123-process-coding-system))
     (let ((coding mpg123-process-coding-system)
 	  (cmdlist (mapcar
-		    '(lambda (a)
-		       (mpg123:get-command-name (concat "dummy." (car a))))
+		    (function
+		     (lambda (a)
+		       (mpg123:get-command-name (concat "dummy." (car a)))))
 		    mpg123-type-alist)))
       (cond
        ((fboundp 'modify-coding-system-alist)
