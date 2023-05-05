@@ -1,8 +1,8 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
 ;;; (c)1999-2023 by HIROSE Yuuji [yuuji>at<gentei.org]
 ;;; $Id: mpg123.el,v 1.63 2023/05/03 05:54:13 yuuji Exp yuuji $
-;;; Last modified Thu May  4 23:18:17 2023 on firestorm
-;;; Update count: 1524
+;;; Last modified Fri May  5 14:33:49 2023 on firestorm
+;;; Update count: 1569
 
 ;;; Commentary:
 ;;	
@@ -1506,6 +1506,7 @@ if slider is already visible.
 そこに表示。
 'always 以外の Non-nil の値なら一曲の演奏開始時点でスライダーが見えていなければ
 ウィンドウ分割し、見えていれば何もしない。")
+(defvar mpg123-time-slide-instant-seek nil)
 
 (defun mpg123:play (&optional startframe)
   "Play mp3 on current line."
@@ -1858,7 +1859,9 @@ percentage in the length of the song etc.
 (defun mpg123-forward (arg)
   "forw"
   (interactive "p")
-  (let ()
+  (let ((arg (if (and mpg123-time-slide-instant-seek (= -1 arg)) -2 arg)))
+    ;; If mpg123-time-slide-instant-seek enabled, rewinding 1sec is too short.
+    ;; We increase rewind time 2sec considering delay of process call.
     ;;set buffer in my responsibility
     (set-buffer (marker-buffer mpg123*cur-play-marker))
     (if mpg123*time-setting-mode
@@ -1894,10 +1897,12 @@ percentage in the length of the song etc.
 	    (move-to-column c)
 	    (mpg123:update-playtime
 	     (format "%02d:%02d" (car time) (cdr time)) 'here)
-	    (message
-	     (mpg123:lang-msg
-	      "Time Slide mode: Type `SPC' to play in that position"
-	      "タイムスライドモード: `SPC' を押してその位置から再生"))))
+	    (if mpg123-time-slide-instant-seek
+		(mpg123-play-stop)
+	      (message
+	       (mpg123:lang-msg
+		"Time Slide mode: Type `SPC' to play in that position"
+		"タイムスライドモード: `SPC' を押してその位置から再生")))))
       (message
        (mpg123:lang-msg
 	"Length not known.  Play this music once please."
