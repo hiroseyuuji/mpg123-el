@@ -1,6 +1,6 @@
 ;;; mpg123.el --- A front-end program to mpg123/ogg123 -*- coding: euc-jp -*-
 ;;; (c)1999-2023 by HIROSE Yuuji [yuuji>at<gentei.org]
-;;; $Id: mpg123.el,v 1.63 2023/05/03 05:54:13 yuuji Exp yuuji $
+;;; $Id: mpg123.el,v 1.64 2023/05/05 06:07:21 yuuji Exp $
 ;;; Last modified Fri May  5 14:33:49 2023 on firestorm
 ;;; Update count: 1569
 
@@ -375,6 +375,9 @@
 ;;
 ;;[History]
 ;; $Log: mpg123.el,v $
+;; Revision 1.64  2023/05/05 06:07:21  yuuji
+;; Summary: Use mplayer by default.  Quick seek by mpg123-time-slide-instant-seek.
+;;
 ;; Revision 1.63  2023/05/03 05:54:13  yuuji
 ;; Summary: (Rollback) Focus-frame not needed for non-XEmacs, dropped.
 ;;
