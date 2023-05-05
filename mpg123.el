@@ -13,8 +13,10 @@
 ;;	
 ;;	The `mpg123' program version 0.59q or later, or ogg123 version
 ;;	1.0 or later, and enough CPU power to run it.
-;;	mpg123 0.59q以降 や ogg123 1.0以降 とそれを走らすのに十分な
-;;	CPUパワー。最低でもMMX??
+;;	For both mp3/ogg files, single MPlayer program is sufficent.
+;;	
+;;	mpg123 0.59q以降 や ogg123 1.0以降(mplayerのみでも可) とそれを走
+;;	らすのに十分なCPUパワー。最低でもMMX??
 ;;	
 ;;[Installation]
 ;;	
@@ -28,10 +30,19 @@
 ;;	  [~/.emacs]
 ;;		(autoload 'mpg123 "mpg123" "A Front-end to mpg123/ogg123" t)
 ;;	
-;;	まず、mpg123あるいはogg123の正常動作を確認してから上の行を
-;;	~/.emacsに追加します。なおmpg123は0.59q以上でないと正常に動作しな
-;;	い可能性があります(もっと新しいのが出たらまた怪しいかもしれん…)。
-;;	ogg123は1.0で動作確認してますがそれ以外でも大丈夫でしょう。
+;;	When  MPlayer  program(mplayer)  is   available  on  your  host,
+;;	mpg123.el  automatically  use  it.   If you  prefer  mpg123/ogg123  to
+;;	MPlayer, you might want to set variable as follows:
+;;	
+;;		(setq mpg123-use-mplayer nil)
+;;	
+;;	まず、MPlayer  をインストールし、コマンドラインでmp3/oggファイル
+;;	が再生できることを確認します。mpg123あるいはogg123でも構いません。
+;;	確認できたら 上記の autoload を ~/.emacsに追加します。MPlayer で
+;;	再生するときに、再生秒数が「A: 0.8 (00.8) of 232.0」のように時々
+;;	刻々と表示されれば問題ありません。MPlayerを使わない場合は上記の
+;;	setq 行を追加しておくとよいでしょう。
+;;	ogg123は1.0で動作確認していますがそれ以外でも大丈夫でしょう。
 ;;	mpg123(または ogg123)コマンド に -v オプションをつけて起動し音楽
 ;;	の再生とともにデコード中のフレーム番号(ogg123の場合は秒数)が画面
 ;;	に表示されるかどうか確認してください。これがうまく行かないとこの
@@ -53,15 +64,14 @@
 ;;	music list buffer.  Please take a look at it.
 ;;	
 ;;	既に MPEG1 audio Layer I/II/III ファイルは持ってるものとして説明
-;;	します(たぶんいわゆるMP3しか持ってないと思うけど気にしないわしも
-;;	Layer2と3は作ったことすらない)。Ogg形式でももちろんおっけーよ。
-;;	で、そのファイルはきっとどこかのディレクトリに整理しておいてある
-;;	と思うので、音楽を聞きたくなったら、まずEmacsを起動し、
+;;	します。Ogg形式でももちろんおっけーよ。で、そのファイルはきっと
+;;	どこかのディレクトリに整理しておいてあると思うので、音楽を聞きた
+;;	くなったら、まずEmacsを起動し、
 ;;	
 ;;		M-x mpg123 ぺし
 ;;		ディレクトリ名 (またはプレイリストファイル名) ぺし
 ;;	
-;;	と打ちます。と、そのディレクトリにある音楽ファイル一覧が出て来る
+;;	と打ちます。と、そのディレクトリにある音楽ファイル一覧が出てくる
 ;;	ので、聞きたい曲に合わせてSPCを打つと演奏が始まります。その他の
 ;;	キーコマンドは音楽一覧バッファの末尾に表示されているのでそっちを
 ;;	見てください。
@@ -165,9 +175,9 @@
 ;;	
 ;;	あまりいじれるところ無いけど、上に書いてある変数がいじれます。
 ;;	
-;;	なおLinuxでは音量調節コマンドとして aumix -w の利用を前提とします。
-;;	このプログラムで音量をいじりたいときは aumix をインストールしてお
-;;	きましょう。
+;;	なおLinuxでは音量調節コマンドとして aumix -w または amixer の利
+;;	用を前提とします。このプログラムで音量をいじりたいときはいずれか
+;;	をインストールしておきましょう。
 ;;	
 ;;[More comfortable]
 ;;	
@@ -177,7 +187,7 @@
 ;;	This  program occupies  one  Emacs window.   Using this  program
 ;;	without any  window manager is  hard job.  Please use  this with
 ;;	windows.el  -  The Window  Manager  for  Emacs  - which  can  be
-;;	obtained   from   http://www.gentei.org/~yuuji/software/.   With
+;;	obtained   from  https://www.gentei.org/~yuuji/software/.   With
 ;;	windows.el,  you can  listen the  music  which is  run in  other
 ;;	frame. Or  if you use  emacs -nw, you  can run mpg123.el  in the
 ;;	background  window and  can  switch from  and  to mpg123  buffer
@@ -191,7 +201,7 @@
 ;;	ンドウでバックグラウンド再生できて、その裏ウィンドウといくつかの
 ;;	編集ウィンドウを切替えて使うなんて事も可能。もちろんこの文章も裏
 ;;	に半分隠れてるフレームでmpg123を走らせながら書いてます。
-;;	windows.el は http://www.gentei.org/~yuuji/software/ からどうぞ。
+;;	windows.el は https://www.gentei.org/~yuuji/software/ からどうぞ。
 ;;	
 ;;[For Extension]
 ;;	
@@ -278,8 +288,12 @@
 ;;	ん。コメントやバグレポートはおおいに歓迎しますので御気軽に御連絡
 ;;	ください。またプログラムに対する個人的な修正は自由にして頂いて構
 ;;	いませんが、それを公開したい場合は私まで御連絡ください。連絡は以
-;;	下のアドレスまでお願いします(2015/12現在)。
+;;	下のアドレスまでお願いします(2023/05現在)。
 ;;							yuuji@gentei.org
+;;[License]
+;;	
+;;	This  software can  be treated  with the  2-Clause BSD  License.
+;;	
 ;;[Acknowledgements]
 ;;	
 ;;	Tijs van Bakel, <smoke>at<casema.net>
