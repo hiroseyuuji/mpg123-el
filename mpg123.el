@@ -1114,13 +1114,6 @@ If optional argument PATTERN given, search it(tentative)."
   (goto-char mpg123*cur-play-marker)
   (skip-chars-forward "^:")
   (skip-chars-backward "^ "))
-					; (defmacro mpg123:goto-playtime-position ()
-					;   (list 'progn
-					; 	(list 'goto-char 'mpg123*cur-play-marker)
-					; 	;(list 'move-to-column 3)
-					; 	(list 'skip-chars-forward "^:")
-					; 	(list 'forward-char -2)
-					; 	))
 
 (defsubst mpg123:update-playtime (timestr &optional here)
   "Update playing time string"
@@ -1131,17 +1124,6 @@ If optional argument PATTERN given, search it(tentative)."
       (delete-char 5)
       (while (/= (char-after (point)) ?/) (delete-char 1))
       (insert timestr))))
-
-					; (defmacro mpg123:update-playtime (timestr)
-					;   (list 'save-excursion
-					; 	(list 'set-buffer (list 'marker-buffer 'mpg123*cur-play-marker))
-					; 	;(list 'set-buffer 'mpg123*buffer)
-					; 	(list 'let (list 'buffer-read-only)
-					; 	      (list 'mpg123:goto-playtime-position)
-					; 	      (list 'delete-char 5)
-					; 	      (list 'insert timestr)
-					; 	      ;(list 'set-buffer-modified-p nil) ;is not essential
-					; 	      )))
 
 (defun mpg123:update-length (timestr)
   "Update music length time string"
@@ -1220,8 +1202,6 @@ If optional argument PATTERN given, search it(tentative)."
 
 (defun mpg123:get-music-info (n attr)
   (cdr (assq attr (assoc n mpg123*music-alist))))
-					; (defmacro mpg123:get-music-info (n attr)
-					;   (list 'cdr (list 'assq attr (list 'assoc n 'mpg123*music-alist))))
 
 (defun mpg123:delete-music-from-list (n)
   "Delete music number N from mpg123*music-alist."
@@ -1243,7 +1223,7 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 このマシンのオーディオデバイスはちゃんと設定したけ?
 あと、ほかにサウンドデバイスを使うアプリケーションを起動して
 いるんちゃう?
-まず、ktermなどで mpg123 コマンド単独で音楽再生できるかどうか
+まず、Terminalで mpg123 コマンド単独で音楽再生できるかどうか
 確認してみれ。
 (スペースキーでオサラバ)
 ***********************************************************" (point)))
@@ -1298,14 +1278,6 @@ mp3 files on your pseudo terminal(xterm, rxvt, etc).
 	   (get-buffer-window mpg123*buffer t))
       (window-width (get-buffer-window mpg123*buffer t))
     mpg123*window-width))
-
-;; (defun mpg123:move-slider (column)
-;;   "Move slider to COLUMN"
-;;   (let ((left (overlay-start mpg123*indicator-overlay)))
-;;     (move-overlay mpg123*slider-overlay
-;; 		  (+ left column)
-;; 		  (+ left column 1)
-;; 		  (overlay-buffer mpg123*slider-overlay))))
 
 ;; Recent mpg123 switched status line format
 ;; > 00088+11671  00:02.29+05:04.87 --- 009=009 128 kb/s  418 B acc    0 clip
