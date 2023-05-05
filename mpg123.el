@@ -600,11 +600,18 @@
 
 ;;; Code:
 
+(defvar mpg123-use-mplayer
+  (or (and (fboundp 'executable-find)
+	     (executable-find "mplayer"))
+	(and (featurep 'xemacs)
+	     (fboundp 'exec-installed-p)
+	     (exec-installed-p "mplayer")))
+  "*Use mplayer command instead of mp123/ogg123.")
 ;; Linux users still using OSS rather than ALSA may wish to use
 ;; (setq mpg123-mixer-type 'aumix) before loading mpg123.el
 (defvar mpg123-mixer-type
   (cond
-   ((executable-find "mplayer")			'mplayer)
+   (mpg123-use-mplayer				'mplayer)
    ((string-match "freebsd" (emacs-version))	'mixer)
    ((string-match "netbsd" (emacs-version))	'mixerctl)
    ((string-match "openbsd" (emacs-version))	'mixerctl) ;not yet tested
@@ -816,8 +823,8 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (defvar mpg123*time-setting-mode nil)
 (defvar mpg123*repeat-count-marker nil)
 (defvar mpg123*loop-count-marker nil)
-					;(defvar mpg123-playlist-regexp ".*\\.m3u"
-					;  "*Regular expression to match to playlist files")
+;(defvar mpg123-playlist-regexp ".*\\.m3u"
+;  "*Regular expression to match to playlist files")
 (defvar mpg123-url-regexp "https?://.*"
   "*Regular expression to match to URL requests")
 
@@ -860,7 +867,8 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
   '(("mp3" . "mpg123") ("ogg" . "ogg123")))
 
 (defvar mpg123-command-alist
-  '(("mp3" . "mplayer") ("ogg" . "mplayer")))
+  (list (cons "mp3" (if mpg123-use-mplayer "mplayer" "mpg123"))
+	(cons "ogg" (if mpg123-use-mplayer "mplayer" "ogg123"))))
 
 (fset 'mpg123:buffer-substring
       (if (fboundp 'buffer-substring-no-properties)
@@ -881,7 +889,7 @@ MP3ファイルかどうか調べるためにファイル名だけで済ます場合は
 (fset 'mpg123:substring
       (if (fboundp 'substring-no-properties)
           'substring-no-properties
-        'substing))
+	#'(lambda(&rest args) (apply 'substring args))))
 
 (defun mpg123:match-string (n &optional m str)
   "Return (buffer-substring (match-beginning N) (match-beginning (or M N)))."
@@ -1461,6 +1469,9 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 (if (featurep 'xemacs) (require 'overlay))
 (if (and (fboundp 'make-face) mpg123*use-face)
     (progn
+      (fset 'mpg123:sfu
+	    (cond ((fboundp 'set-face-underline) 'set-face-underline)
+		  ((fboundp 'set-face-underline-p) 'set-face-underline-p)))
       (make-face 'mpg123-face-cur)
       (make-face 'mpg123-face-slider)
       (make-face 'mpg123-face-indicator)
@@ -1476,8 +1487,8 @@ mpg123-face-playing のDOC-STRINGも参照せよ")
 	    (set-face-background 'mpg123-face-slider (cdr mpg123-face-slider))
 	    (set-face-foreground 'mpg123-face-indicator (car mpg123-face-indicator))
 	    (set-face-background 'mpg123-face-indicator (cdr mpg123-face-indicator)))
-	(set-face-underline-p 'mpg123-face-cur t)
-	(set-face-underline-p 'mpg123-face-slider t)
+	(mpg123:sfu 'mpg123-face-cur t)
+	(mpg123:sfu 'mpg123-face-slider t)
 	(set-face-background 'mpg123-face-slider "white")))
   (setq mpg123*use-face nil))
 
@@ -1533,10 +1544,10 @@ if slider is already visible.
       (setq music (mpg123:get-music-info mpg123*cur-music-number 'filename)
 	    mpg123*cur-music-file music)
       (cond
-       ((fboundp 'code-convert-string)
+       ((fboundp 'code-convert-string) ;; -> 'encode-coding-string
 	(setq music (code-convert-string
 		     music mpg123-process-coding-system '*internal*)))
-       ((fboundp 'encode-coding-string)
+       ((fboundp 'encode-coding-string) ;; -> 'encode-coding-string
 	(setq music (encode-coding-string
 		     music mpg123-file-name-coding-system))))
       (and (eq mpg123-mixer-type 'mixer.exe)		;convert to dos filename for
@@ -2363,7 +2374,7 @@ When called from function, optional argument COMMAND directly select the job."
 
 (defun mpg123:mp3-files-in-dir (dir)
   "Return mp3 files in a directory"
-  (let*((default-file-name-coding-system mpg123-file-name-coding-system)
+  (let*((file-name-coding-system mpg123-file-name-coding-system)
 	(files (sort (directory-files dir) 'string<)) f mp3s)
     (while files
       (message "Inspect file %s..." (car files))
@@ -2532,7 +2543,9 @@ Optional 4th arg OFFSET is added to BEGIN and END."
   (let*((file-name-coding-system mpg123-file-name-coding-system)
 	(buf (get-buffer-create " *mpg123tmp"))
 	(title "") (artist "") (md (match-data))
-	(dcode (car (detect-coding-string file)))
+	(dcode (if (fboundp 'detect-coding-string)
+		   (car (detect-coding-string file))
+		 mpg123-file-name-coding-system))
 	(coding (symbol-name dcode))
 	(process-coding-system-alist
 	 (list (cons mpg123-program-ogginfo (cons dcode dcode))))
@@ -2796,7 +2809,7 @@ the music will immediately move to that position."
 
 (defun mpg123:add-musiclist-to-point (files i)
   "Add music FILES to point and music-info-alist"
-  (let ((default-file-name-coding-system mpg123-file-name-coding-system)
+  (let ((file-name-coding-system mpg123-file-name-coding-system)
 	f sf (i (1+ (mpg123:max-music-number))) name)
     (while files
       (setq f (car files))
